@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+.cw-root { min-height: 100vh; background: radial-gradient(ellipse at 15% 20%, #0a0828 0%, #040212 50%, #000009 100%); color: #e0d0c0; font-family: 'Crimson Text', serif; position: relative; overflow-x: hidden; }
+.cw-stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.cw-star { position: absolute; background: white; border-radius: 50%; opacity: .1; animation: starTwinkle linear infinite; }
+.cw-content { position: relative; z-index: 1; }
+.cw-header { text-align: center; padding: 18px 12px 10px; }
+.cw-title { font-family: 'Cinzel Decorative', serif; font-size: clamp(1.5rem, 4vw, 2.2rem); letter-spacing: 6px; margin: 0; background: linear-gradient(90deg, #d4a843, #f0e080, #c060ff, #40e080, #d4a843); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shimmer 5s linear infinite; }
+.cw-subtitle { font-family: 'Cinzel', serif; font-size: .52rem; letter-spacing: 8px; color: #3c2c1c; margin-top: 3px; }
+.cw-status-bar { display: flex; justify-content: center; align-items: center; gap: 22px; margin-top: 10px; font-family: 'Cinzel', serif; font-size: .74rem; flex-wrap: wrap; }
+.cw-faction { color: #4a3828; transition: color .3s; }
+.cw-faction.active { color: #e0cc52; }
+.cw-faction.active-dark { color: #b850f8; }
+.cw-status-label { font-weight: 600; letter-spacing: 1px; color: #6a4c2a; transition: color .3s; }
+.cw-status-label.status-check { color: #ff7830; animation: blink .75s ease infinite; }
+.cw-status-label.status-checkmate { color: #ff2e18; }
+.cw-status-label.status-stalemate { color: #7878b8; }
+.cw-main { display: flex; gap: 10px; padding: 6px 12px 16px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.cw-side-boards { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+.cw-portal-label { text-align: center; font-size: .5rem; color: rgba(160,120,40,.35); font-family: 'Cinzel', serif; letter-spacing: 3px; }
+.cw-center { flex-shrink: 0; }
+.cw-captured { margin-top: 8px; padding: 5px 10px; background: rgba(16,8,3,.9); border: 1px solid rgba(100,65,18,.35); border-radius: 6px; display: flex; align-items: center; gap: 8px; font-size: .95rem; }
+.cw-captured-w { color: rgba(195,150,55,.65); flex: 1; word-break: break-all; }
+.cw-captured-b { color: rgba(135,45,195,.65); flex: 1; text-align: right; word-break: break-all; }
+.cw-captured-label { font-family: 'Cinzel', serif; font-size: .42rem; color: rgba(100,70,30,.4); letter-spacing: 2px; white-space: nowrap; }
+.cw-right-panel { width: 235px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+.cw-reset-btn { background: rgba(44,12,4,.88); border: 1px solid rgba(148,42,12,.45); color: #ae4228; padding: 8px 16px; font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 3px; border-radius: 5px; cursor: pointer; width: 100%; transition: all .2s; }
+.cw-reset-btn:hover { background: rgba(90,24,8,.9); color: #d06040; border-color: rgba(200,70,20,.55); }
+::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: rgba(0,0,0,.2); } ::-webkit-scrollbar-thumb { background: rgba(180,130,40,.35); border-radius: 2px; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes selGlow { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+@keyframes dotPulse { 0%, 100% { transform: scale(.7); opacity: .5; } 50% { transform: scale(1.1); opacity: 1; } }
+@keyframes capPulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+@keyframes pieceFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes starTwinkle { 0%, 50%, 100% { opacity: .1; } 25% { opacity: .7; } 75% { opacity: .3; } }
+@keyframes narrBlink { 0%, 100% { opacity: .7; } 50% { opacity: .2; } }
+@keyframes cursorBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
