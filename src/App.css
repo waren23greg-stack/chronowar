@@ -78,3 +78,12 @@ html, body, #root { height: 100%; }
 .cw-chronicle-close:hover { background:rgba(90,24,8,.9); color:#d06040; }
 .cw-chronicle-copy { background:rgba(20,40,12,.88); border:1px solid rgba(42,148,42,.35); color:#42ae42; padding:9px 22px; font-family:'Cinzel',serif; font-size:.62rem; letter-spacing:2px; border-radius:5px; cursor:pointer; transition:all .2s; }
 .cw-chronicle-copy:hover { background:rgba(30,70,20,.9); color:#62ce62; }
+
+/* ── Mute button ── */
+.cw-mute-btn { background: rgba(20,10,30,.8); border: 1px solid rgba(100,60,160,.3); color: #8060c0; padding: 5px 10px; font-size: .9rem; border-radius: 6px; cursor: pointer; transition: all .2s; line-height: 1; }
+.cw-mute-btn:hover { background: rgba(50,20,80,.9); border-color: rgba(180,100,255,.5); }
+.cw-mute-btn.muted { color: #4a3860; border-color: rgba(60,40,90,.3); }
+
+/* ── Audio pulse on narration ── */
+@keyframes audioPulse { 0%,100% { box-shadow: 0 0 4px rgba(180,130,40,.2); } 50% { box-shadow: 0 0 16px rgba(180,130,40,.6); } }
+.narrating .cw-chronicle-panel { animation: audioPulse 1.4s ease infinite; }

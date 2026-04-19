@@ -10,6 +10,11 @@ import {
 import { generateNarration } from "./narrative";
 import { getBestMove, getEasyMove } from "./ai";
 import { generateBattleChronicle } from "./chronicle";
+import {
+  bootAudio, sfxMove, sfxCapture, sfxRealmTranscend,
+  sfxCheck, sfxCheckmate, sfxGameStart, sfxPromotion,
+  sfxAiThinking, updateMusicFromGame, setMasterVolume,
+} from "./audio";
 import RealmBoard from "./components/RealmBoard";
 import ChroniclePanel, { SagaScroll, PieceLegend } from "./components/ChroniclePanel";
 import "./App.css";
@@ -52,7 +57,20 @@ export default function App() {
   const storyCtx                  = useRef([]);
   const twTimer                   = useRef(null);
 
-  // ── Battle Chronicle overlay ──
+  // ── Audio ──
+  const [audioReady, setAudioReady] = useState(false);
+  const [muted, setMuted]           = useState(false);
+  const totalCaptures               = useRef(0);
+
+  const ensureAudio = useCallback(() => {
+    if (!audioReady) { bootAudio(); setAudioReady(true); }
+  }, [audioReady]);
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    setMasterVolume(next ? 0 : 0.82);
+  };
   const [showChronicle, setShowChronicle]         = useState(false);
   const [chronicleData, setChronicleData]         = useState(null);
   const [chronicleLoading, setChronicleLoading]   = useState(false);
@@ -107,6 +125,18 @@ export default function App() {
     const nb = applyMove(currentBoards, fromRealm, fromRow, fromCol, toRealm, toRow, toCol);
     const promo = pt(movePiece) === "P" && ((isW(movePiece) && toRow === 0) || (isB(movePiece) && toRow === 5));
 
+    const isCrossRealm = fromRealm !== toRealm;
+
+    // ── Audio ──
+    if (capPiece) {
+      totalCaptures.current += 1;
+      if (isCrossRealm) sfxRealmTranscend(); else sfxCapture();
+    } else if (isCrossRealm) {
+      sfxRealmTranscend();
+    } else {
+      sfxMove(false, false);
+    }
+
     if (capPiece)
       setCaptured(prev => ({ ...prev, [isW(capPiece) ? "white" : "black"]: [...prev[isW(capPiece) ? "white" : "black"], capPiece] }));
 
@@ -115,7 +145,7 @@ export default function App() {
     const newCheck  = inCheck(nb, newTurn === "white");
     const hasLegal  = hasAnyLegal(nb, newTurn === "white");
     const newStatus = !hasLegal ? (newCheck ? "checkmate" : "stalemate") : newCheck ? "check" : "playing";
-    const cross     = fromRealm !== toRealm;
+    const cross     = isCrossRealm;
 
     const info = {
       piece: movePiece, num, side: isW(movePiece) ? "white" : "black",
@@ -131,9 +161,17 @@ export default function App() {
     setStatus(newStatus);
     doNarration(info);
 
+    // ── Status audio ──
     if (newStatus === "checkmate" || newStatus === "stalemate") {
+      setTimeout(() => sfxCheckmate(), 200);
       setTimeout(() => setShowOver(true), 1800);
+    } else if (newStatus === "check") {
+      sfxCheck();
     }
+    if (promo) setTimeout(() => sfxPromotion(), 150);
+
+    // ── Update music phase ──
+    updateMusicFromGame(num, newStatus, totalCaptures.current);
 
     return { nb, newTurn, num, newStatus };
   }, [doNarration]);
@@ -147,6 +185,7 @@ export default function App() {
     const taunts = AI_TAUNTS[difficultyRef.current] || AI_TAUNTS.medium;
     setAiTaunt(taunts[Math.floor(Math.random() * taunts.length)]);
     setAiThinking(true);
+    sfxAiThinking();
 
     const delay = difficulty === "easy" ? 700 : difficulty === "medium" ? 1200 : 1800;
 
@@ -165,6 +204,8 @@ export default function App() {
 
   // ── Human click ──
   const handleClick = (realm, row, col) => {
+    ensureAudio();
+    if (!audioReady && moveNum === 0) { bootAudio(); setAudioReady(true); sfxGameStart(); }
     if (status === "checkmate" || status === "stalemate") return;
     if (mode === "vs-ai" && turn === "black") return;
     const piece = boards[realm][row][col];
@@ -203,6 +244,8 @@ export default function App() {
     setCaptured({ white: [], black: [] });
     setMoveNum(0); setLastMove(null);
     setStoryLog([]); storyCtx.current = [];
+    totalCaptures.current = 0;
+    updateMusicFromGame(0, "playing", 0);
     setNarr("A new war begins. The armies assume their eternal positions once more — let the chronicles be written anew…");
     setNarrating(false); setAiThinking(false); setAiTaunt("");
     setShowOver(false); setShowChronicle(false); setChronicleData(null);
@@ -246,6 +289,9 @@ export default function App() {
                 ))}
               </div>
             )}
+            <button className={`cw-mute-btn ${muted ? "muted" : ""}`} onClick={toggleMute} title={muted ? "Unmute" : "Mute"}>
+              {muted ? "🔇" : "🔊"}
+            </button>
           </div>
 
           <div className="cw-status-bar">
