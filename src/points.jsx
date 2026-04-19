@@ -1,24 +1,28 @@
 // ============================================================
-//  CHRONOWAR — Points & Ranking System
+//  CHRONOWAR — Points, ELO & Ranking System v3
+//  Chess.com-grade: Glicko K-decay · Per-diff tracking ·
+//  Rank-up toast · Post-game report card · Live HUD
 // ============================================================
+import { useState, useEffect } from "react";
 
-const KEY = "cw_stats_v1";
+const KEY = "cw_stats_v3";
 
-const RANK_TIERS = [
-  { name: "Timewarden",    min: 0,    color: "#8a7255", icon: "🛡" },
-  { name: "Chronorider",   min: 200,  color: "#80a040", icon: "🏇" },
-  { name: "Realm Knight",  min: 500,  color: "#5599cc", icon: "⚔" },
-  { name: "Sage of Ages",  min: 1000, color: "#cc9922", icon: "✦" },
-  { name: "Phase Walker",  min: 2000, color: "#aa44ee", icon: "◈" },
-  { name: "Time Sovereign",min: 4000, color: "#ee8822", icon: "♛" },
-  { name: "Eternal Lord",  min: 8000, color: "#ff4488", icon: "♔" },
+// ── Rank tiers ──────────────────────────────────────────────
+export const RANK_TIERS = [
+  { name: "Timewarden",    min: 0,    max: 199,      color: "#8a7255", icon: "🛡" },
+  { name: "Chronorider",   min: 200,  max: 499,      color: "#80a040", icon: "🏇" },
+  { name: "Realm Knight",  min: 500,  max: 999,      color: "#5599cc", icon: "⚔" },
+  { name: "Sage of Ages",  min: 1000, max: 1999,     color: "#cc9922", icon: "✦" },
+  { name: "Phase Walker",  min: 2000, max: 3999,     color: "#aa44ee", icon: "◈" },
+  { name: "Time Sovereign",min: 4000, max: 7999,     color: "#ee8822", icon: "♛" },
+  { name: "Eternal Lord",  min: 8000, max: Infinity, color: "#ff4488", icon: "♔" },
 ];
 
-// ── Load / save ──────────────────────────────────────────
+// ── Storage ──────────────────────────────────────────────────
 export function loadStats() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return { ...defaultStats(), ...JSON.parse(raw) };
   } catch {}
   return defaultStats();
 }
@@ -29,51 +33,48 @@ export function saveStats(stats) {
 
 function defaultStats() {
   return {
-    cp: 0,            // chronicle points total
+    cp: 0,
     gamesPlayed: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
+    wins: 0, losses: 0, draws: 0,
     elo: 1000,
-    totalCaptures: 0,
-    totalCrossRealm: 0,
-    totalChecks: 0,
-    fastestWin: null, // move count
-    longestGame: 0,
-    streak: 0,
-    bestStreak: 0,
+    totalCaptures: 0, totalCrossRealm: 0, totalChecks: 0, totalPromotions: 0,
+    fastestWin: null, longestGame: 0,
+    streak: 0, bestStreak: 0,
+    highestElo: 1000,
+    winsPerDiff:   { easy: 0, medium: 0, hard: 0 },
+    lossesPerDiff: { easy: 0, medium: 0, hard: 0 },
+    recentGames: [],  // last 10
   };
 }
 
-// ── Points awarded per event ─────────────────────────────
+// ── Points table ──────────────────────────────────────────────
 export const POINTS = {
-  capture:        5,
-  crossRealm:     3,
-  check:          8,
-  promotion:      12,
-  win_easy:       30,
-  win_medium:     55,
-  win_hard:       80,
-  win_2player:    40,
-  draw:           10,
-  loss:           2,   // participation
-  fast_win:       25,  // win in <20 moves
-  streak_bonus:   15,  // every 3 wins streak
+  capture:       5,
+  captureRook:   10,
+  captureQueen:  18,
+  crossRealm:    8,
+  check:         10,
+  promotion:     15,
+  win_easy:      30,
+  win_medium:    55,
+  win_hard:      100,
+  win_2player:   40,
+  draw:          10,
+  loss:          2,
+  fast_win:      30,
+  streak_bonus:  15,
+  brilliant_game:25,
 };
 
-// ── Rank helpers ─────────────────────────────────────────
+// ── Rank helpers ──────────────────────────────────────────────
 export function getRank(cp) {
   let rank = RANK_TIERS[0];
-  for (const tier of RANK_TIERS) {
-    if (cp >= tier.min) rank = tier;
-  }
+  for (const t of RANK_TIERS) { if (cp >= t.min) rank = t; }
   return rank;
 }
 
 export function getNextRank(cp) {
-  for (const tier of RANK_TIERS) {
-    if (cp < tier.min) return tier;
-  }
+  for (const t of RANK_TIERS) { if (cp < t.min) return t; }
   return null;
 }
 
@@ -81,175 +82,566 @@ export function getProgressToNext(cp) {
   const rank = getRank(cp);
   const next = getNextRank(cp);
   if (!next) return 1;
-  const range = next.min - rank.min;
-  const progress = cp - rank.min;
-  return Math.min(progress / range, 1);
+  return Math.min((cp - rank.min) / (next.min - rank.min), 1);
 }
 
-// ── ELO calculation ──────────────────────────────────────
-export function calcElo(playerElo, opponentElo, result) {
-  const K = 32;
-  const expected = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
-  const delta = Math.round(K * (result - expected));
-  return Math.max(800, playerElo + delta);
+export function detectRankUp(prevCp, newCp) {
+  const a = getRank(prevCp), b = getRank(newCp);
+  return a.name !== b.name ? { from: a, to: b } : null;
 }
 
-// AI difficulty ELO
+// ── ELO — Glicko-style K-factor decay ─────────────────────────
+function kFactor(games) {
+  if (games < 20) return 40;
+  if (games < 80) return 20;
+  return 10;
+}
+
+export function calcElo(playerElo, opponentElo, result, games = 30) {
+  const K  = kFactor(games);
+  const E  = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
+  const d  = Math.round(K * (result - E));
+  return { newElo: Math.max(400, playerElo + d), delta: d };
+}
+
 export const AI_ELO = { easy: 900, medium: 1200, hard: 1500 };
 
-// ── Award points and update stats ────────────────────────
-export function awardGameEnd(stats, { result, difficulty, moveCount, mode }) {
-  const s = { ...stats };
+// ── Accuracy heuristic ────────────────────────────────────────
+function computeAccuracy({ captures = 0, crossRealm = 0, checks = 0, promotions = 0, totalMoves = 1, result }) {
+  let s = 52;
+  s += Math.min(22, (captures   / totalMoves) * 75);
+  s += Math.min(12, (crossRealm / totalMoves) * 60);
+  s += Math.min(8,  (checks     / totalMoves) * 55);
+  s += promotions * 3;
+  if (result === "win")  s += 8;
+  if (result === "loss") s -= 8;
+  return Math.round(Math.min(100, Math.max(0, s)));
+}
+
+function classifyAccuracy(pct) {
+  if (pct >= 92) return { label: "Brilliant",  color: "#00bcd4", glyph: "💎" };
+  if (pct >= 80) return { label: "Excellent",  color: "#4caf50", glyph: "✨" };
+  if (pct >= 68) return { label: "Good",       color: "#8bc34a", glyph: "👍" };
+  if (pct >= 55) return { label: "Fair",       color: "#ffc107", glyph: "⚡" };
+  if (pct >= 42) return { label: "Inaccurate", color: "#ff9800", glyph: "⚠" };
+  return             { label: "Blundering", color: "#f44336", glyph: "💀" };
+}
+
+// ── Award game end ─────────────────────────────────────────────
+export function awardGameEnd(stats, { result, difficulty, moveCount, mode, gameStats = {} }) {
+  const s = {
+    ...defaultStats(), ...stats,
+    winsPerDiff:   { easy:0,medium:0,hard:0, ...(stats.winsPerDiff   || {}) },
+    lossesPerDiff: { easy:0,medium:0,hard:0, ...(stats.lossesPerDiff || {}) },
+    recentGames:   stats.recentGames || [],
+    highestElo:    stats.highestElo  || stats.elo,
+    totalPromotions: stats.totalPromotions || 0,
+  };
   s.gamesPlayed += 1;
 
+  const eloRes = calcElo(s.elo, AI_ELO[difficulty] || 1200, result === "win" ? 1 : result === "draw" ? 0.5 : 0, s.gamesPlayed);
+  const accuracy = computeAccuracy({ ...gameStats, totalMoves: moveCount, result });
+
+  let cpGained = 0;
   if (result === "win") {
     s.wins += 1;
     s.streak += 1;
     s.bestStreak = Math.max(s.bestStreak, s.streak);
-
+    if (s.winsPerDiff[difficulty] !== undefined) s.winsPerDiff[difficulty]++;
     const winKey = mode === "vs-ai" ? `win_${difficulty}` : "win_2player";
-    s.cp += POINTS[winKey] || POINTS.win_medium;
-
-    if (moveCount < 20) s.cp += POINTS.fast_win;
+    cpGained += POINTS[winKey] || POINTS.win_medium;
+    if (moveCount <= 15) cpGained += POINTS.fast_win;
     if (moveCount > s.longestGame) s.longestGame = moveCount;
     if (!s.fastestWin || moveCount < s.fastestWin) s.fastestWin = moveCount;
-
-    if (s.streak % 3 === 0) s.cp += POINTS.streak_bonus * Math.floor(s.streak / 3);
-
-    if (mode === "vs-ai") {
-      s.elo = calcElo(s.elo, AI_ELO[difficulty] || 1200, 1);
-    }
+    if (s.streak > 0 && s.streak % 3 === 0) cpGained += POINTS.streak_bonus;
+    if ((gameStats.blunders || 0) === 0 && moveCount > 4) cpGained += POINTS.brilliant_game;
+    if (mode === "vs-ai") { s.elo = eloRes.newElo; }
   } else if (result === "draw") {
     s.draws += 1;
     s.streak = 0;
-    s.cp += POINTS.draw;
-    if (mode === "vs-ai") s.elo = calcElo(s.elo, AI_ELO[difficulty] || 1200, 0.5);
+    cpGained += POINTS.draw;
+    if (mode === "vs-ai") s.elo = eloRes.newElo;
   } else {
     s.losses += 1;
     s.streak = 0;
-    s.cp += POINTS.loss;
-    if (mode === "vs-ai") s.elo = calcElo(s.elo, AI_ELO[difficulty] || 1200, 0);
+    cpGained += POINTS.loss;
+    if (s.lossesPerDiff[difficulty] !== undefined) s.lossesPerDiff[difficulty]++;
+    if (mode === "vs-ai") s.elo = eloRes.newElo;
   }
 
+  s.cp += cpGained;
+  s.highestElo = Math.max(s.highestElo, s.elo);
+  s.recentGames = [
+    { result, difficulty, moveCount, accuracy, eloDelta: eloRes.delta, cpGained, date: Date.now() },
+    ...s.recentGames,
+  ].slice(0, 10);
+
   saveStats(s);
   return s;
 }
 
-export function awardMoveEvent(stats, { captures = 0, crossRealm = false, check = false, promotion = false }) {
+// ── Award move event ───────────────────────────────────────────
+export function awardMoveEvent(stats, { captures = 0, crossRealm = false, check = false, promotion = false, captureType = "regular" }) {
   const s = { ...stats };
-  s.cp += captures * POINTS.capture;
-  s.totalCaptures += captures;
-  if (crossRealm) { s.cp += POINTS.crossRealm; s.totalCrossRealm += 1; }
-  if (check)      { s.cp += POINTS.check;      s.totalChecks += 1; }
-  if (promotion)  s.cp += POINTS.promotion;
+  if (captures > 0) {
+    s.cp += captureType === "queen" ? POINTS.captureQueen
+           : captureType === "rook"  ? POINTS.captureRook
+           : POINTS.capture;
+    s.totalCaptures = (s.totalCaptures || 0) + captures;
+  }
+  if (crossRealm) { s.cp += POINTS.crossRealm; s.totalCrossRealm = (s.totalCrossRealm||0) + 1; }
+  if (check)      { s.cp += POINTS.check;      s.totalChecks     = (s.totalChecks    ||0) + 1; }
+  if (promotion)  { s.cp += POINTS.promotion;  s.totalPromotions = (s.totalPromotions||0) + 1; }
   saveStats(s);
   return s;
 }
 
-// ── Points HUD component ─────────────────────────────────
-import { useState } from "react";
+// ═══ COMPONENTS ═════════════════════════════════════════════
 
+// ── PointsHUD — live chess.com-style sidebar panel ────────────
 export function PointsHUD({ stats, lastAward = null }) {
-  const [showDetail, setShowDetail] = useState(false);
-  const rank = getRank(stats.cp);
-  const next = getNextRank(stats.cp);
-  const prog = getProgressToNext(stats.cp);
+  const [open, setOpen] = useState(false);
+  const rank    = getRank(stats.cp);
+  const next    = getNextRank(stats.cp);
+  const prog    = getProgressToNext(stats.cp);
+  const last    = stats.recentGames?.[0];
+  const winRate = stats.gamesPlayed > 0 ? Math.round((stats.wins / stats.gamesPlayed) * 100) : 0;
+  const F = "'Cinzel', serif";
 
   return (
-    <div style={{ position: "relative" }}>
-      {/* Main HUD bar */}
-      <div
-        onClick={() => setShowDetail(d => !d)}
-        style={{
-          background: "rgba(8,4,18,.92)",
-          border: `1px solid ${rank.color}35`,
-          borderRadius: 8,
-          padding: "8px 14px",
-          cursor: "pointer",
-          transition: "all .2s",
-          boxShadow: `0 0 16px ${rank.color}12`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: "1.1rem" }}>{rank.icon}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span style={{ fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1.5px", color: rank.color }}>
+    <div style={{ position: "relative", fontFamily: F }}>
+
+      {/* ── Main HUD card ── */}
+      <div onClick={() => setOpen(o => !o)} style={{
+        background: "rgba(6,3,16,.93)",
+        border: `1px solid ${rank.color}42`,
+        borderRadius: 10, padding: "12px 14px",
+        cursor: "pointer", transition: "border-color .25s",
+        boxShadow: `0 0 22px ${rank.color}16`,
+      }}>
+
+        {/* Row 1 – ELO + W/L/D */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ fontSize:10, letterSpacing:2, color:"rgba(150,110,45,.6)", textTransform:"uppercase" }}>Rating</span>
+            <span style={{ fontSize:19, fontWeight:700, color:"#e8d5a3", letterSpacing:.5 }}>{stats.elo}</span>
+            {last && (
+              <span style={{ fontSize:11, fontWeight:700, color: last.eloDelta >= 0 ? "#4caf50" : "#f44336" }}>
+                {last.eloDelta >= 0 ? "▲" : "▼"}{Math.abs(last.eloDelta)}
+              </span>
+            )}
+            {(stats.highestElo > stats.elo) && (
+              <span style={{ fontSize:9, color:"rgba(150,120,50,.45)", marginLeft:2 }}>
+                pk {stats.highestElo}
+              </span>
+            )}
+          </div>
+          <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+            <span style={{ fontSize:11, fontWeight:600, color:"#4caf50" }}>{stats.wins}W</span>
+            <span style={{ fontSize:9, color:"rgba(120,90,30,.35)" }}>/</span>
+            <span style={{ fontSize:11, fontWeight:600, color:"#f44336" }}>{stats.losses}L</span>
+            <span style={{ fontSize:9, color:"rgba(120,90,30,.35)" }}>/</span>
+            <span style={{ fontSize:11, color:"rgba(180,160,100,.45)" }}>{stats.draws}D</span>
+          </div>
+        </div>
+
+        {/* Row 2 – Rank icon + name + progress */}
+        <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:6 }}>
+          <span style={{ fontSize:18, lineHeight:1 }}>{rank.icon}</span>
+          <div style={{ flex:1 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+              <span style={{ fontSize:11, letterSpacing:1.5, color:rank.color, fontWeight:600 }}>
                 {rank.name.toUpperCase()}
               </span>
-              <span style={{ fontFamily: "'Cinzel', serif", fontSize: "13px", color: "#c48020", letterSpacing: "1px" }}>
+              <span style={{ fontSize:12, color:"#c48020", letterSpacing:.5 }}>
                 {stats.cp.toLocaleString()} CP
               </span>
             </div>
             {/* Progress bar */}
-            <div style={{ height: 3, background: "rgba(100,70,20,.3)", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ height:5, background:"rgba(100,70,20,.22)", borderRadius:3, overflow:"hidden" }}>
               <div style={{
-                height: "100%",
-                width: `${prog * 100}%`,
-                background: `linear-gradient(90deg, ${rank.color}99, ${rank.color})`,
-                transition: "width .6s ease",
-                borderRadius: 2,
+                height:"100%", width:`${prog*100}%`,
+                background: `linear-gradient(90deg, ${rank.color}70, ${rank.color})`,
+                transition: "width .7s cubic-bezier(.4,0,.2,1)",
+                borderRadius: 3,
+                boxShadow: `0 0 8px ${rank.color}55`,
               }} />
             </div>
           </div>
         </div>
-        {next && (
-          <div style={{ fontSize: "10px", color: "rgba(100,65,18,.65)", fontFamily: "'Cinzel', serif", marginTop: 4, letterSpacing: "1px" }}>
-            {next.min - stats.cp} CP to {next.name}
-          </div>
-        )}
+
+        {/* Row 3 – CP to next + streak */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          {next
+            ? <span style={{ fontSize:9, color:"rgba(100,72,20,.5)", letterSpacing:.8 }}>
+                {next.min - stats.cp} CP → {next.icon} {next.name}
+              </span>
+            : <span style={{ fontSize:9, color:"#ff4488", letterSpacing:1 }}>⚔ MAX RANK</span>
+          }
+          {stats.streak >= 2 && (
+            <span style={{ fontSize:10, color:"#ff9800" }}>🔥 {stats.streak}</span>
+          )}
+        </div>
       </div>
 
-      {/* Flash award */}
-      {lastAward && lastAward > 0 && (
+      {/* ── CP flash ── */}
+      {lastAward != null && lastAward > 0 && (
         <div style={{
-          position: "absolute", top: -22, right: 8,
-          fontFamily: "'Cinzel', serif", fontSize: "13px",
-          color: "#ffd060", letterSpacing: "1px",
-          animation: "awardPop .6s ease forwards",
-          pointerEvents: "none",
-        }}>
-          +{lastAward} CP
-        </div>
+          position:"absolute", top:-26, right:8,
+          fontFamily: F, fontSize:14, color:"#ffd060",
+          fontWeight:700, letterSpacing:1,
+          animation:"awardPop .7s ease forwards",
+          pointerEvents:"none",
+          textShadow:"0 0 10px rgba(255,200,50,.9)",
+        }}>+{lastAward} CP</div>
       )}
 
-      {/* Detail panel */}
-      {showDetail && (
+      {/* ── Dropdown stats panel ── */}
+      {open && (
         <div style={{
-          position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
-          background: "rgba(6,3,18,.98)",
-          border: `1px solid ${rank.color}28`,
-          borderRadius: 8,
-          padding: "14px 16px",
-          zIndex: 50,
-          boxShadow: "0 8px 32px rgba(0,0,0,.7)",
-          animation: "overlayIn .2s ease",
+          position:"absolute", top:"calc(100% + 6px)", left:0, right:0,
+          background:"rgba(4,2,12,.98)",
+          border:`1px solid ${rank.color}28`,
+          borderRadius:10, padding:"15px 14px",
+          zIndex:50,
+          boxShadow:"0 14px 44px rgba(0,0,0,.75)",
+          animation:"overlayIn .2s ease",
         }}>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "3px", color: "rgba(130,85,20,.7)", marginBottom: 10 }}>
-            CHRONICLE STATS
+          <div style={{ fontSize:9, letterSpacing:3, color:"rgba(130,90,20,.6)", marginBottom:10, textTransform:"uppercase" }}>
+            Chronicle Stats
           </div>
-          {[
-            ["ELO Rating", stats.elo],
-            ["Games Played", stats.gamesPlayed],
-            [`W / D / L`, `${stats.wins} / ${stats.draws} / ${stats.losses}`],
-            ["Win Streak", `${stats.streak} 🔥`],
-            ["Best Streak", stats.bestStreak],
-            ["Captures", stats.totalCaptures],
-            ["Cross-Realm", stats.totalCrossRealm],
-            ["Fastest Win", stats.fastestWin ? `${stats.fastestWin} moves` : "—"],
-          ].map(([label, val], i) => (
-            <div key={i} style={{
-              display: "flex", justifyContent: "space-between",
-              padding: "4px 0",
-              borderBottom: i < 7 ? "1px solid rgba(100,70,20,.12)" : "none",
-              fontSize: ".8rem",
+
+          {/* Stats grid 2-col */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px 10px", marginBottom:11 }}>
+            {[
+              ["⚡ Peak ELO",     stats.highestElo || stats.elo],
+              ["📊 Win Rate",     `${winRate}%`],
+              ["⚔ Captures",     stats.totalCaptures || 0],
+              ["🌀 Cross-Realm",  stats.totalCrossRealm || 0],
+              ["† Checks",        stats.totalChecks || 0],
+              ["♟ Promotions",   stats.totalPromotions || 0],
+              ["🏆 Best Streak",  stats.bestStreak],
+              ["⚡ Fastest Win",  stats.fastestWin ? `${stats.fastestWin}mv` : "—"],
+            ].map(([lbl, val]) => (
+              <div key={lbl} style={{
+                display:"flex", justifyContent:"space-between",
+                padding:"3px 0", borderBottom:"1px solid rgba(100,70,20,.1)", fontSize:11,
+              }}>
+                <span style={{ color:"rgba(155,125,75,.62)" }}>{lbl}</span>
+                <span style={{ color:"rgba(220,190,120,.92)", fontWeight:600 }}>{val}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Per-difficulty record */}
+          {stats.winsPerDiff && (
+            <>
+              <div style={{ fontSize:9, letterSpacing:3, color:"rgba(130,90,20,.6)", marginBottom:6, textTransform:"uppercase" }}>
+                Record by Difficulty
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:4, marginBottom:10 }}>
+                {["easy","medium","hard"].map(d => (
+                  <div key={d} style={{ background:"rgba(255,255,255,.03)", borderRadius:5, padding:"5px 6px", textAlign:"center" }}>
+                    <div style={{ fontSize:9, color:"rgba(140,110,60,.55)", letterSpacing:1, textTransform:"uppercase", marginBottom:3 }}>{d}</div>
+                    <div style={{ fontSize:12 }}>
+                      <span style={{ color:"#4caf50" }}>{stats.winsPerDiff[d]||0}W</span>
+                      <span style={{ color:"rgba(120,90,30,.35)", margin:"0 2px" }}>/</span>
+                      <span style={{ color:"#f44336" }}>{stats.lossesPerDiff?.[d]||0}L</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Recent games list */}
+          {stats.recentGames?.length > 0 && (
+            <>
+              <div style={{ fontSize:9, letterSpacing:3, color:"rgba(130,90,20,.6)", marginBottom:6, textTransform:"uppercase" }}>
+                Recent Games
+              </div>
+              {stats.recentGames.slice(0,5).map((g, i) => {
+                const rc = g.result==="win" ? "#4caf50" : g.result==="loss" ? "#f44336" : "#ffc107";
+                return (
+                  <div key={i} style={{
+                    display:"flex", justifyContent:"space-between",
+                    padding:"4px 0", borderBottom:"1px solid rgba(100,70,20,.07)", fontSize:10,
+                  }}>
+                    <span style={{ color:rc, fontWeight:700, width:14 }}>
+                      {g.result==="win"?"W":g.result==="loss"?"L":"D"}
+                    </span>
+                    <span style={{ color:"rgba(140,110,60,.55)", width:50 }}>{g.difficulty}</span>
+                    <span style={{ color: g.eloDelta>=0?"#4caf50":"#f44336", width:36, textAlign:"right" }}>
+                      {g.eloDelta>=0?"+":""}{g.eloDelta}
+                    </span>
+                    <span style={{ color:"#c48020", width:50, textAlign:"right" }}>+{g.cpGained}CP</span>
+                    <span style={{ color:"#8bc34a", width:34, textAlign:"right" }}>{g.accuracy}%</span>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── RankUpToast ────────────────────────────────────────────────
+export function RankUpToast({ rankUpData, onDismiss }) {
+  const [vis, setVis] = useState(false);
+  useEffect(() => {
+    if (!rankUpData) return;
+    requestAnimationFrame(() => setVis(true));
+    const t = setTimeout(() => { setVis(false); setTimeout(onDismiss, 500); }, 4800);
+    return () => clearTimeout(t);
+  }, [rankUpData]); // eslint-disable-line
+
+  if (!rankUpData) return null;
+  const { from, to } = rankUpData;
+  return (
+    <div style={{
+      position:"fixed", top:20, left:"50%",
+      transform: `translateX(-50%) ${vis ? "translateY(0)" : "translateY(-50px)"}`,
+      opacity: vis ? 1 : 0,
+      transition:"all 0.55s cubic-bezier(.34,1.56,.64,1)",
+      zIndex:9999, pointerEvents:"none",
+    }}>
+      <div style={{
+        display:"flex", alignItems:"center", gap:18,
+        background:"linear-gradient(135deg,rgba(6,3,18,.98),rgba(18,9,4,.98))",
+        border:`2px solid ${to.color}`,
+        borderRadius:16, padding:"16px 30px",
+        boxShadow:`0 0 60px ${to.color}45, 0 10px 40px rgba(0,0,0,.65)`,
+        position:"relative", overflow:"hidden",
+        fontFamily:"'Cinzel', serif",
+      }}>
+        <div style={{
+          position:"absolute", inset:0,
+          background:`radial-gradient(ellipse at 50% -10%, ${to.color}22 0%, transparent 65%)`,
+        }} />
+        <span style={{ fontSize:46, filter:`drop-shadow(0 0 14px ${to.color})`, position:"relative" }}>{to.icon}</span>
+        <div style={{ position:"relative" }}>
+          <div style={{ fontSize:9, letterSpacing:4, color:"#c8a840", textTransform:"uppercase", marginBottom:5 }}>
+            ✦ Rank Promotion ✦
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <span style={{ fontSize:13, color:"rgba(180,150,80,.55)" }}>{from.icon} {from.name}</span>
+            <span style={{ fontSize:18, color:"#c8a840" }}>→</span>
+            <span style={{ fontSize:19, fontWeight:700, color:to.color }}>{to.icon} {to.name}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PostGameReport — chess.com-style result card ───────────────
+export function PostGameReport({ reportData, lastNarr, onNewGame, onChronicle }) {
+  if (!reportData) return null;
+  const {
+    result, difficulty, moveCount,
+    prevElo, newElo, eloDelta,
+    cpGained, rankBefore, rankAfter, promoted,
+    captures, crossRealm, checks,
+  } = reportData;
+
+  const accuracy = computeAccuracy({ captures, crossRealm, checks, totalMoves: moveCount, result });
+  const accClass = classifyAccuracy(accuracy);
+  const resultColor = result==="win" ? "#4caf50" : result==="loss" ? "#f44336" : "#ffc107";
+  const resultLabel = result==="win" ? "VICTORY" : result==="loss" ? "DEFEATED" : "STALEMATE";
+  const F = "'Cinzel', serif";
+
+  // SVG accuracy ring
+  const R = 38, CIRC = 2 * Math.PI * R;
+  const dash = CIRC * (accuracy / 100);
+
+  return (
+    <div style={{
+      position:"fixed", inset:0,
+      background:"rgba(8,4,18,.87)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      zIndex:100, backdropFilter:"blur(8px)",
+    }}>
+      <div style={{
+        background:"linear-gradient(160deg,#110d06 0%,#1c1409 50%,#0e0c08 100%)",
+        border:"1px solid rgba(180,140,50,.38)",
+        borderRadius:16, padding:"28px 26px",
+        width:360, maxHeight:"92vh", overflowY:"auto",
+        fontFamily: F,
+        boxShadow:"0 0 80px rgba(180,140,50,.12), 0 20px 60px rgba(0,0,0,.65)",
+        animation:"overlayIn .45s cubic-bezier(.34,1.56,.64,1)",
+        scrollbarWidth:"thin",
+      }}>
+
+        {/* Header */}
+        <div style={{ textAlign:"center", marginBottom:16 }}>
+          <div style={{ fontSize:28, fontWeight:800, letterSpacing:5, color:resultColor,
+            textShadow:`0 0 18px ${resultColor}55`, marginBottom:3 }}>
+            {resultLabel}
+          </div>
+          <div style={{ fontSize:10, letterSpacing:2, color:"rgba(140,105,40,.6)" }}>
+            {difficulty?.toUpperCase()} · {moveCount} MOVES
+          </div>
+        </div>
+
+        {/* Accuracy ring */}
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:18 }}>
+          <div style={{ position:"relative", width:100, height:100 }}>
+            <svg viewBox="0 0 100 100" width={100} height={100}>
+              <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="7" />
+              <circle cx="50" cy="50" r={R} fill="none"
+                stroke={accClass.color} strokeWidth="7"
+                strokeDasharray={`${dash} ${CIRC}`}
+                strokeLinecap="round"
+                transform="rotate(-90 50 50)"
+                style={{ transition:"stroke-dasharray 1.2s ease", filter:`drop-shadow(0 0 6px ${accClass.color}80)` }}
+              />
+            </svg>
+            <div style={{
+              position:"absolute", inset:0,
+              display:"flex", flexDirection:"column",
+              alignItems:"center", justifyContent:"center",
             }}>
-              <span style={{ color: "rgba(160,130,80,.7)", fontFamily: "'Cinzel', serif", fontSize: "12px", letterSpacing: "1px" }}>{label}</span>
-              <span style={{ color: "rgba(215,185,120,.9)" }}>{val}</span>
+              <span style={{ fontSize:9, marginBottom:1 }}>{accClass.glyph}</span>
+              <span style={{ fontSize:20, fontWeight:800, color:accClass.color, lineHeight:1 }}>{accuracy}%</span>
+              <span style={{ fontSize:8, letterSpacing:1.5, color:accClass.color, marginTop:1 }}>
+                {accClass.label.toUpperCase()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ELO row */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+          padding:"9px 12px", background:"rgba(255,255,255,.03)",
+          borderRadius:8, marginBottom:6, border:"1px solid rgba(255,255,255,.05)" }}>
+          <span style={{ fontSize:11, color:"rgba(160,130,75,.65)" }}>⚡ Rating</span>
+          <span style={{ fontSize:14, fontWeight:700, color:"#e8d5a3" }}>
+            {newElo}
+            <span style={{ fontSize:12, marginLeft:8, color: eloDelta>=0 ? "#4caf50":"#f44336" }}>
+              ({eloDelta>=0?"+":""}{eloDelta})
+            </span>
+          </span>
+        </div>
+
+        {/* Rank row */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+          padding:"9px 12px", background:"rgba(255,255,255,.03)",
+          borderRadius:8, marginBottom:14, border:"1px solid rgba(255,255,255,.05)" }}>
+          <span style={{ fontSize:11, color:"rgba(160,130,75,.65)" }}>🏆 Rank</span>
+          <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+            <span style={{ fontSize:13, fontWeight:700, color:rankAfter.color }}>
+              {rankAfter.icon} {rankAfter.name}
+            </span>
+            {promoted && (
+              <span style={{
+                fontSize:8, letterSpacing:1.5, color:"#c8a840",
+                border:"1px solid #c8a840", borderRadius:3, padding:"1px 5px",
+              }}>▲ PROMOTED</span>
+            )}
+          </div>
+        </div>
+
+        {/* CP earned breakdown */}
+        <div style={{ background:"rgba(255,255,255,.025)", borderRadius:8,
+          padding:"11px 12px", marginBottom:14, border:"1px solid rgba(200,168,64,.1)" }}>
+          <div style={{ fontSize:9, letterSpacing:2.5, color:"rgba(140,105,40,.6)",
+            textTransform:"uppercase", marginBottom:9 }}>Chronicle Points Earned</div>
+          <CPBreakdown
+            result={result} difficulty={difficulty} moveCount={moveCount}
+            captures={captures} crossRealm={crossRealm} checks={checks}
+          />
+          <div style={{ display:"flex", justifyContent:"space-between",
+            borderTop:"1px solid rgba(200,168,64,.18)", marginTop:7, paddingTop:7,
+            fontSize:13, fontWeight:700 }}>
+            <span style={{ color:"rgba(200,175,120,.8)" }}>Total</span>
+            <span style={{ color:"#c8a840" }}>+{cpGained} CP</span>
+          </div>
+        </div>
+
+        {/* Game stats mini-grid */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:6, marginBottom:16 }}>
+          {[
+            ["⚔", captures||0,   "Captures"],
+            ["🌀", crossRealm||0, "Cross-Realm"],
+            ["†",  checks||0,     "Checks"],
+          ].map(([icon,val,lbl]) => (
+            <div key={lbl} style={{
+              display:"flex", flexDirection:"column", alignItems:"center", gap:2,
+              background:"rgba(255,255,255,.03)", borderRadius:7,
+              padding:"8px 4px", border:"1px solid rgba(255,255,255,.05)",
+            }}>
+              <span style={{ fontSize:18 }}>{icon}</span>
+              <span style={{ fontSize:18, fontWeight:700, color:"#e8d5a3" }}>{val}</span>
+              <span style={{ fontSize:9, color:"rgba(140,110,55,.5)", letterSpacing:.8 }}>{lbl}</span>
             </div>
           ))}
         </div>
-      )}
+
+        {/* Last narration excerpt */}
+        {lastNarr && (
+          <div style={{
+            fontFamily:"'Crimson Text', serif", fontStyle:"italic",
+            fontSize:13, color:"rgba(160,130,80,.55)", lineHeight:1.7,
+            borderTop:"1px solid rgba(180,140,50,.12)", paddingTop:12, marginBottom:16,
+          }}>
+            "{lastNarr.slice(0,140)}{lastNarr.length>140?"…":""}"
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {onChronicle && (
+            <button onClick={onChronicle} style={{
+              background:"rgba(70,40,8,.92)", border:"1.5px solid rgba(155,105,28,.6)",
+              color:"#f4dc80", padding:"13px", fontFamily: F, fontSize:12,
+              letterSpacing:2, borderRadius:8, cursor:"pointer", width:"100%",
+              transition:"all .2s", boxShadow:"0 3px 12px rgba(0,0,0,.3)",
+            }}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(100,55,14,.96)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(70,40,8,.92)"}
+            >📖 READ THE FULL CHRONICLE</button>
+          )}
+          <button onClick={onNewGame} style={{
+            background:"rgba(255,255,255,.1)", border:"1.5px solid rgba(100,70,22,.38)",
+            color:"#c8a840", padding:"11px", fontFamily: F, fontSize:11,
+            letterSpacing:2, borderRadius:8, cursor:"pointer", width:"100%",
+            transition:"all .2s",
+          }}
+            onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.18)"}
+            onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.1)"}
+          >↺ FIGHT AGAIN</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sub-component: CP breakdown list
+function CPBreakdown({ result, difficulty, moveCount, captures, crossRealm, checks }) {
+  const items = [];
+  if (captures  > 0) items.push(["⚔ Captures",      captures,   POINTS.capture]);
+  if (crossRealm> 0) items.push(["🌀 Cross-Realm",   crossRealm, POINTS.crossRealm]);
+  if (checks    > 0) items.push(["† Checks",          checks,     POINTS.check]);
+  if (result === "win") {
+    const winKey = `win_${difficulty}`;
+    items.push([`🏆 Victory (${difficulty})`, 1, POINTS[winKey]||POINTS.win_medium]);
+    if (moveCount <= 15) items.push(["⚡ Swift Victory", 1, POINTS.fast_win]);
+  } else if (result === "draw") {
+    items.push(["🤝 Stalemate", 1, POINTS.draw]);
+  } else {
+    items.push(["📜 Participation", 1, POINTS.loss]);
+  }
+  return (
+    <div>
+      {items.map(([label, count, pts], i) => (
+        <div key={i} style={{ display:"flex", justifyContent:"space-between",
+          padding:"3px 0", fontSize:11, borderBottom:"1px solid rgba(100,70,20,.08)" }}>
+          <span style={{ color:"rgba(160,130,75,.65)" }}>{label}{count>1 ? ` ×${count}`:""}</span>
+          <span style={{ color:"#c48020" }}>+{pts*count} CP</span>
+        </div>
+      ))}
     </div>
   );
 }

@@ -26,7 +26,11 @@ import LandingPage from "./components/LandingPage";
 import Tutorial from "./components/Tutorial";
 import ChronicleCard from "./components/ChronicleCard";
 import MobileLayout from "./components/MobileLayout";
-import { PointsHUD, loadStats, awardGameEnd, awardMoveEvent } from "./points.jsx";
+import {
+  PointsHUD, RankUpToast, PostGameReport,
+  detectRankUp, getRank, POINTS,
+  loadStats, awardGameEnd, awardMoveEvent,
+} from "./points.jsx";
 import "./App.css";
 
 const STARS = Array.from({ length: 65 }, (_, i) => ({
@@ -127,6 +131,10 @@ export default function App() {
   // ── Points ──
   const [stats, setStats]         = useState(() => loadStats());
   const [lastAward, setLastAward] = useState(null);
+  const [rankUpData, setRankUpData] = useState(null);
+  const [gameReport, setGameReport] = useState(null);
+  const statsRef = useRef(stats);
+  useEffect(() => { statsRef.current = stats; }, [stats]);
   const awardFlash = (pts) => { setLastAward(pts); setTimeout(() => setLastAward(null), 1600); };
 
   // ── Refs to avoid stale closures ──
@@ -253,16 +261,48 @@ export default function App() {
     doNarration(info);
 
     // ── Status audio ──
+    // Snapshot stats at move start (fixes stale closure)
+    let _ws = statsRef.current;
+
     if (newStatus === "checkmate" || newStatus === "stalemate" || newStatus === "draw") {
       setTimeout(() => sfxCheckmate(), 200);
       setTimeout(() => setShowOver(true), 1800);
       // Award game-end points
       const result = newStatus === "stalemate" ? "draw"
                    : (isW(movePiece) ? "white" : "black") === currentTurn ? "win" : "loss";
-      const endStats = awardGameEnd(stats, { result, difficulty, moveCount: num, mode });
-      const endGain = endStats.cp - stats.cp;
+      const endStats = awardGameEnd(_ws, {
+        result,
+        difficulty: difficultyRef.current,
+        moveCount: num, mode,
+        gameStats: {
+          captures:   captureCount.current,
+          crossRealm: crossRealmCount.current,
+          checks:     checkCount.current,
+        },
+      });
+      const endGain = endStats.cp - _ws.cp;
       setStats(endStats);
-      if (endGain > 0) awardFlash(endGain);
+      // Rank-up detection
+      const _rankUp = detectRankUp(_ws.cp, endStats.cp);
+      if (_rankUp) setTimeout(() => setRankUpData(_rankUp), 2400);
+      // Store report for PostGameReport overlay
+      setGameReport({
+        result,
+        difficulty: difficultyRef.current,
+        moveCount: num,
+        prevElo:   _ws.elo,
+        newElo:    endStats.elo,
+        eloDelta:  endStats.elo - _ws.elo,
+        cpGained:  Math.max(0, endGain),
+        rankBefore: getRank(_ws.cp),
+        rankAfter:  getRank(endStats.cp),
+        promoted:  !!_rankUp,
+        captures:   captureCount.current,
+        crossRealm: crossRealmCount.current,
+        checks:     checkCount.current,
+      });
+      // Use endStats as base for move-event awards below
+      _ws = endStats;
     } else if (newStatus === "check") {
       sfxCheck();
       checkCount.current += 1;
@@ -272,18 +312,22 @@ export default function App() {
     // ── Update music phase ──
     updateMusicFromGame(num, newStatus, totalCaptures.current);
 
-    // ── Award move points ──
-    const awardedStats = awardMoveEvent(stats, {
-      captures: capPiece ? 1 : 0,
-      crossRealm: isCrossRealm,
-      check: newCheck,
-      promotion: promo,
+    // ── Award move points (capture type-aware) ──
+    const _capType = capPiece
+      ? (pt(capPiece) === "Q" ? "queen" : pt(capPiece) === "R" ? "rook" : "regular")
+      : "none";
+    const awardedStats = awardMoveEvent(_ws, {
+      captures:    capPiece ? 1 : 0,
+      crossRealm:  isCrossRealm,
+      check:       newCheck,
+      promotion:   promo,
+      captureType: _capType,
     });
     const gained =
-      (capPiece ? 5 : 0) +
-      (isCrossRealm ? 3 : 0) +
-      (newCheck ? 8 : 0) +
-      (promo ? 12 : 0);
+      (capPiece ? (_capType==="queen" ? POINTS.captureQueen : _capType==="rook" ? POINTS.captureRook : POINTS.capture) : 0) +
+      (isCrossRealm ? POINTS.crossRealm : 0) +
+      (newCheck     ? POINTS.check      : 0) +
+      (promo        ? POINTS.promotion  : 0);
     if (gained > 0) { setStats(awardedStats); awardFlash(gained); }
 
     return { nb, newTurn, num, newStatus };
@@ -380,6 +424,7 @@ export default function App() {
     setNarr("A new war begins. The armies assume their eternal positions once more — let the chronicles be written anew…");
     setNarrating(false); setAiThinking(false); setAiTaunt("");
     setShowOver(false); setShowChronicle(false); setChronicleData(null);
+    setGameReport(null); setRankUpData(null);
   };
 
   const wTurn = turn === "white";
@@ -412,27 +457,12 @@ export default function App() {
           setShowTutorial={setShowTutorial} setScreen={setScreen}
         />
         {showOver && (
-          <div className="cw-overlay">
-            <div className="cw-overlay-box" style={{ margin:"0 16px", padding:"28px 24px" }}>
-              <div className="cw-over-title" style={{ fontSize:"1.3rem" }}>
-                {status === "checkmate" ? "THE WAR ENDS" : "STALEMATE"}
-              </div>
-              <div className="cw-over-msg">
-                {status === "checkmate"
-                  ? `${turn === "white" ? "Umbral Conclave" : "Luminar Order"} claims dominion!`
-                  : "The rivers of time stand frozen."}
-              </div>
-              {storyLog[0] && (
-                <div className="cw-over-last" style={{ fontSize:".8rem" }}>
-                  "{storyLog[0].t.slice(0,120)}{storyLog[0].t.length>120?"…":""}"
-                </div>
-              )}
-              <div className="cw-over-actions">
-                <button onClick={openChronicle} className="cw-chronicle-btn">READ THE FULL CHRONICLE</button>
-                <button onClick={reset} className="cw-reset-btn" style={{marginTop:8}}>FIGHT AGAIN</button>
-              </div>
-            </div>
-          </div>
+          <PostGameReport
+            reportData={gameReport}
+            lastNarr={storyLog[0]?.t}
+            onNewGame={reset}
+            onChronicle={openChronicle}
+          />
         )}
         {showChronicle && (
           <div className="cw-overlay" onClick={() => setShowChronicle(false)}>
@@ -548,36 +578,14 @@ export default function App() {
         </main>
       </div>
 
-      {/* ── Game Over Overlay ── */}
+      {/* ── Game Over — Post-Game Report ── */}
       {showOver && (
-        <div className="cw-overlay">
-          <div className="cw-overlay-box">
-            <div className="cw-over-icon">
-              {status === "checkmate" ? "☠" : "⚖"}
-            </div>
-            <div className="cw-over-title">
-              {status === "checkmate" ? "THE WAR ENDS" : "ETERNAL STALEMATE"}
-            </div>
-            <div className="cw-over-msg">
-              {status === "checkmate"
-                ? `${turn === "white" ? "The Umbral Conclave" : "The Luminar Order"} claims dominion across all three realms of time!`
-                : "Neither order can advance. The rivers of time stand frozen."}
-            </div>
-            {storyLog[0] && (
-              <div className="cw-over-last">
-                "{storyLog[0].t.slice(0, 160)}{storyLog[0].t.length > 160 ? "…" : ""}"
-              </div>
-            )}
-            <div className="cw-over-actions">
-              <button onClick={openChronicle} className="cw-chronicle-btn">
-                📖 READ THE FULL CHRONICLE
-              </button>
-              <button onClick={reset} className="cw-reset-btn" style={{marginTop:6}}>
-                ↺ FIGHT AGAIN
-              </button>
-            </div>
-          </div>
-        </div>
+        <PostGameReport
+          reportData={gameReport}
+          lastNarr={storyLog[0]?.t}
+          onNewGame={reset}
+          onChronicle={openChronicle}
+        />
       )}
 
       {/* ── Battle Chronicle Modal ── */}
@@ -641,6 +649,7 @@ export default function App() {
         />
       )}
       {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+      <RankUpToast rankUpData={rankUpData} onDismiss={() => setRankUpData(null)} />
     </div>
   );
 }
