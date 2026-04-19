@@ -344,3 +344,31 @@ html, body, #root { height: 100%; }
 @keyframes landFloat   { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-10px); } }
 @keyframes starTwinkle { 0%,50%,100% { opacity:.08; } 25% { opacity:.65; } 75% { opacity:.25; } }
 @keyframes nebulaDrift { 0% { transform:translate(0,0) scale(1); } 100% { transform:translate(30px,18px) scale(1.08); } }
+
+/* ══════════════════════════════════════════════
+   MOBILE — Touch-friendly overrides
+   ══════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Kill stars on mobile — performance */
+  .cw-stars { display: none; }
+
+  /* Boards fill width */
+  .cw-root { touch-action: pan-y; }
+
+  /* Prevent pull-to-refresh interfering with swipe */
+  body { overscroll-behavior: none; }
+
+  /* Larger hit targets for squares */
+  .cw-square { min-width: 44px; min-height: 44px; }
+
+  /* Overlay fits mobile */
+  .cw-overlay-box { margin: 0 12px; border-radius: 12px; padding: 28px 20px; }
+  .cw-chronicle-box { margin: 12px; border-radius: 14px; max-height: 90dvh; }
+
+  /* Overlay titles scale down */
+  .cw-over-title { font-size: 1.3rem !important; }
+  .cw-chronicle-title { font-size: 1.1rem; }
+}
+
+/* Cursor blink */
+@keyframes cursorBlink { 0%,100% { opacity:1; } 50% { opacity:0; } }

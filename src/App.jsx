@@ -20,6 +20,7 @@ import ChroniclePanel, { SagaScroll, PieceLegend } from "./components/ChronicleP
 import LandingPage from "./components/LandingPage";
 import Tutorial from "./components/Tutorial";
 import ChronicleCard from "./components/ChronicleCard";
+import MobileLayout from "./components/MobileLayout";
 import { PointsHUD, loadStats, awardGameEnd, awardMoveEvent } from "./points.jsx";
 import "./App.css";
 
@@ -89,7 +90,13 @@ export default function App() {
   // ── Game over overlay ──
   const [showOver, setShowOver]   = useState(false);
 
-  // ── Screen state ──
+  // ── Responsive ──
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
   const [screen, setScreen]         = useState("landing"); // "landing" | "game"
   const [showTutorial, setShowTutorial] = useState(false);
 
@@ -309,6 +316,83 @@ export default function App() {
 
   if (screen === "landing") {
     return <LandingPage onPlay={() => setScreen("game")} />;
+  }
+
+  // ── Mobile layout ──
+  if (isMobile) {
+    return (
+      <div className="cw-root" data-realm={activeRealm}>
+        <MobileLayout
+          boards={boards} sel={sel} moves={moves} lastMove={lastMove}
+          turn={turn} status={status} moveNum={moveNum}
+          aiThinking={aiThinking} aiTaunt={aiTaunt}
+          narrating={narrating} displayed={displayed} storyLog={storyLog}
+          stats={stats} lastAward={lastAward} captured={captured}
+          activeRealm={activeRealm} setActiveRealm={setActiveRealm}
+          handleClick={handleClick} reset={reset} openChronicle={openChronicle}
+          mode={mode} difficulty={difficulty}
+          setMode={setMode} setDifficulty={setDifficulty}
+          muted={muted} toggleMute={toggleMute}
+          setShowTutorial={setShowTutorial} setScreen={setScreen}
+        />
+        {showOver && (
+          <div className="cw-overlay">
+            <div className="cw-overlay-box" style={{ margin:"0 16px", padding:"28px 24px" }}>
+              <div className="cw-over-title" style={{ fontSize:"1.3rem" }}>
+                {status === "checkmate" ? "THE WAR ENDS" : "STALEMATE"}
+              </div>
+              <div className="cw-over-msg">
+                {status === "checkmate"
+                  ? `${turn === "white" ? "Umbral Conclave" : "Luminar Order"} claims dominion!`
+                  : "The rivers of time stand frozen."}
+              </div>
+              {storyLog[0] && (
+                <div className="cw-over-last" style={{ fontSize:".8rem" }}>
+                  "{storyLog[0].t.slice(0,120)}{storyLog[0].t.length>120?"…":""}"
+                </div>
+              )}
+              <div className="cw-over-actions">
+                <button onClick={openChronicle} className="cw-chronicle-btn">READ THE FULL CHRONICLE</button>
+                <button onClick={reset} className="cw-reset-btn" style={{marginTop:8}}>FIGHT AGAIN</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showChronicle && (
+          <div className="cw-overlay" onClick={() => setShowChronicle(false)}>
+            <div className="cw-chronicle-box" style={{ margin:"12px", maxHeight:"90dvh" }} onClick={e=>e.stopPropagation()}>
+              <div className="cw-chronicle-header">
+                {chronicleLoading
+                  ? <div className="cw-chronicle-loading-title">The Grand Chronicler writes…</div>
+                  : <div className="cw-chronicle-title">{chronicleData?.title}</div>}
+              </div>
+              <div className="cw-chronicle-body">
+                {chronicleLoading
+                  ? <div className="cw-chronicle-spinner">Ink flows across the pages of eternity…</div>
+                  : chronicleData?.body?.split("\n\n").map((p,i)=><p key={i} className="cw-chronicle-para">{p}</p>)}
+              </div>
+              <div className="cw-chronicle-footer">
+                <button onClick={() => { setShowChronicle(false); reset(); }} className="cw-chronicle-close">Close</button>
+                {!chronicleLoading && (
+                  <button onClick={() => setShowCard(true)} className="cw-chronicle-btn" style={{ fontSize:".55rem", padding:"8px 14px", letterSpacing:"1px" }}>
+                    CREATE CARD
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {showCard && chronicleData && (
+          <ChronicleCard
+            data={{ title:chronicleData.title, winner:turn==="white"?"Umbral Conclave":"Luminar Order",
+              moveCount:moveNum, captures:captureCount.current, crossRealm:crossRealmCount.current,
+              checks:checkCount.current, cpEarned:stats.cp, moments:storyLog.slice(0,5).map(e=>e.t) }}
+            onClose={() => setShowCard(false)}
+          />
+        )}
+        {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+      </div>
+    );
   }
 
   return (
