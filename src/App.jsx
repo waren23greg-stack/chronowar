@@ -15,6 +15,11 @@ import {
   sfxCheck, sfxCheckmate, sfxGameStart, sfxPromotion,
   sfxAiThinking, updateMusicFromGame, setMasterVolume,
 } from "./audio";
+import {
+  hashBoards, checkRepetition, isFatigued, tickFatigue,
+  shouldResetClock, calcCP, getConvergenceWarnings,
+  applyConvergenceRemovals, CROSS_REALM_BUDGET,
+} from "./gameRules";
 import RealmBoard from "./components/RealmBoard";
 import ChroniclePanel, { SagaScroll, PieceLegend } from "./components/ChroniclePanel";
 import LandingPage from "./components/LandingPage";
@@ -83,9 +88,28 @@ export default function App() {
   const [showCard, setShowCard]                   = useState(false);
 
   // Game stat trackers for the card
-  const captureCount  = useRef(0);
+  const captureCount    = useRef(0);
   const crossRealmCount = useRef(0);
-  const checkCount    = useRef(0);
+  const checkCount      = useRef(0);
+
+  // ── Advanced Rules state ──
+  const [fatigueMap, setFatigueMap]           = useState({});
+  const [posHistory, setPosHistory]           = useState([]);
+  const [clock50, setClock50]                 = useState(0);
+  const [crossCount, setCrossCount]           = useState({ white: 0, black: 0 });
+  const [drawReason, setDrawReason]           = useState(null);
+  const [convergenceWarn, setConvergenceWarn] = useState([]);
+  const [lastMoveByPiece, setLastMoveByPiece] = useState({});
+  const fatigueRef    = useRef({});
+  const posHistRef    = useRef([]);
+  const clock50Ref    = useRef(0);
+  const crossCountRef = useRef({ white: 0, black: 0 });
+  const lmbpRef       = useRef({});
+  useEffect(() => { fatigueRef.current    = fatigueMap; },    [fatigueMap]);
+  useEffect(() => { posHistRef.current    = posHistory; },    [posHistory]);
+  useEffect(() => { clock50Ref.current    = clock50; },       [clock50]);
+  useEffect(() => { crossCountRef.current = crossCount; },    [crossCount]);
+  useEffect(() => { lmbpRef.current       = lastMoveByPiece; }, [lastMoveByPiece]);
 
   // ── Game over overlay ──
   const [showOver, setShowOver]   = useState(false);
@@ -154,7 +178,35 @@ export default function App() {
 
     const isCrossRealm = fromRealm !== toRealm;
 
-    // ── Audio ──
+    // ── Advanced Rules ──
+    // Convergence removals first
+    const { boards: nbClean, removed: convRemoved } =
+      applyConvergenceRemovals(nb, currentMoveNum + 1, lmbpRef.current);
+    const finalNb = convRemoved.length ? nbClean : nb;
+
+    // Fatigue update
+    const newFatigue = tickFatigue(fatigueRef.current, isCrossRealm, toRealm, toRow, toCol);
+    setFatigueMap(newFatigue);
+
+    // Cross-realm budget
+    const side0 = isW(movePiece) ? "white" : "black";
+    if (isCrossRealm) setCrossCount(prev => ({ ...prev, [side0]: prev[side0] + 1 }));
+
+    // 50-move temporal clock
+    const newClock = shouldResetClock(movePiece, capPiece, isCrossRealm) ? 0 : clock50Ref.current + 1;
+    setClock50(newClock);
+
+    // Position history (threefold)
+    const hash = hashBoards(finalNb);
+    const newPosHist = [...posHistRef.current, hash];
+    setPosHistory(newPosHist);
+
+    // LastMoveByPiece tracking
+    const pieceKey = `${toRealm}_${toRow}_${toCol}`;
+    const newLmbp = { ...lmbpRef.current, [pieceKey]: currentMoveNum + 1 };
+    setLastMoveByPiece(newLmbp);
+
+    // Audio ──
     if (capPiece) {
       totalCaptures.current += 1;
       captureCount.current  += 1;
@@ -173,8 +225,18 @@ export default function App() {
     const num       = currentMoveNum + 1;
     const newCheck  = inCheck(nb, newTurn === "white");
     const hasLegal  = hasAnyLegal(nb, newTurn === "white");
-    const newStatus = !hasLegal ? (newCheck ? "checkmate" : "stalemate") : newCheck ? "check" : "playing";
-    const cross     = isCrossRealm;
+    // Draw detection
+    const isRepetition = checkRepetition(newPosHist);
+    const isClockDraw  = newClock >= 50;
+    const newStatus = !hasLegal
+      ? (newCheck ? "checkmate" : "stalemate")
+      : isRepetition ? "draw"
+      : isClockDraw  ? "draw"
+      : newCheck     ? "check"
+      : "playing";
+    if (isRepetition) setDrawReason("repetition");
+    if (isClockDraw)  setDrawReason("clock-50");
+    const cross = isCrossRealm;
 
     const info = {
       piece: movePiece, num, side: isW(movePiece) ? "white" : "black",
@@ -191,7 +253,7 @@ export default function App() {
     doNarration(info);
 
     // ── Status audio ──
-    if (newStatus === "checkmate" || newStatus === "stalemate") {
+    if (newStatus === "checkmate" || newStatus === "stalemate" || newStatus === "draw") {
       setTimeout(() => sfxCheckmate(), 200);
       setTimeout(() => setShowOver(true), 1800);
       // Award game-end points
@@ -265,6 +327,17 @@ export default function App() {
     if (sel) {
       const mv = moves.find(m => m.realm === realm && m.row === row && m.col === col);
       if (mv) {
+        const isCross = sel.realm !== realm;
+        // Cross-realm budget check
+        if (isCross && crossCount[turn] >= CROSS_REALM_BUDGET) {
+          setNarr(`The ${turn === "white" ? "Luminar Order" : "Umbral Conclave"} has exhausted their 18 cross-realm transcendences. No more realm crossings permitted.`);
+          setSel(null); setMoves([]); return;
+        }
+        // Temporal fatigue check
+        if (isCross && isFatigued(fatigueMap, sel.realm, sel.row, sel.col)) {
+          setNarr(`This piece is temporally fatigued — it must rest 2 more turns before crossing realms again.`);
+          setSel(null); setMoves([]); return;
+        }
         const movePiece = boards[sel.realm][sel.row][sel.col];
         setSel(null); setMoves([]);
         commitMove(boards, movePiece, sel.realm, sel.row, sel.col, realm, row, col, turn, moveNum);
@@ -296,10 +369,13 @@ export default function App() {
     setCaptured({ white: [], black: [] });
     setMoveNum(0); setLastMove(null);
     setStoryLog([]); storyCtx.current = [];
-    totalCaptures.current = 0;
-    captureCount.current  = 0;
+    totalCaptures.current   = 0;
+    captureCount.current    = 0;
     crossRealmCount.current = 0;
-    checkCount.current    = 0;
+    checkCount.current      = 0;
+    setFatigueMap({}); setPosHistory([]); setClock50(0);
+    setCrossCount({ white: 0, black: 0 }); setDrawReason(null);
+    setConvergenceWarn([]); setLastMoveByPiece({});
     updateMusicFromGame(0, "playing", 0);
     setNarr("A new war begins. The armies assume their eternal positions once more — let the chronicles be written anew…");
     setNarrating(false); setAiThinking(false); setAiTaunt("");
