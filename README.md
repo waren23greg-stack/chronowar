@@ -5,9 +5,9 @@
 
 *Chess reimagined — every move generates AI epic storytelling across three simultaneous timelines*
 
-[![Live Demo](https://img.shields.io/badge/▶_PLAY_NOW-chronowar.vercel.app-d4a843?style=for-the-badge)](https://chronowar.vercel.app)
+[![Live Demo](https://img.shields.io/badge/▶_PLAY_NOW-chronowar.vercel.app-c89030?style=for-the-badge)](https://chronowar.vercel.app)
 [![Built with React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev)
-[![Powered by Claude](https://img.shields.io/badge/Narration-Claude_AI-c060ff?style=flat-square)](https://anthropic.com)
+[![Powered by Claude](https://img.shields.io/badge/Narration-Claude_AI-8848c0?style=flat-square)](https://anthropic.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 </div>
@@ -29,12 +29,42 @@ It is chess. It is a story. It is a living legend.
 | 🌍 **Three Realms** | Past, Present & Future boards — all active simultaneously |
 | 📖 **AI Narration** | Every move generates 2–3 verses of epic storytelling via Claude |
 | 🤖 **AI Opponent** | Minimax + alpha-beta pruning across all three realms. Easy / Medium / Hard |
+| 🗺 **Living Map** | Parchment map background that auto-shifts per active realm (Past/Present/Future) |
 | 🏛 **Landing Page** | Cinematic hero page with feature showcase |
 | 📚 **Tutorial** | 6-step interactive guide with live visual examples |
-| 🏆 **Points & Ranking** | Chronicle Points, ELO rating, 7 rank tiers — persisted locally |
+| 🏆 **Points & Ranking** | Chronicle Points, ELO rating, 7 rank tiers — persisted in localStorage |
 | 🎻 **Orchestral Score** | Procedural strings (violin/viola/cello/flute/harp) — pure Web Audio API |
 | 📜 **Battle Chronicle** | Post-game Claude writes the entire war as one shareable epic story |
-| 🎨 **SVG Pieces** | Hand-drawn dimensional chess pieces — no emoji |
+| 🖼 **Chronicle Card** | Export a beautiful parchment image card (16:9 or 1:1) with QR code — share on X or Instagram |
+| 🎨 **SVG Pieces** | Heraldic hand-drawn chess pieces — clean, high-contrast, no bloom |
+
+---
+
+## 🖼 Chronicle Card
+
+After every checkmate, ChronoWar generates a **shareable image card** rendered entirely on HTML Canvas:
+
+- **16:9 format** — optimised for X (Twitter) Cards
+- **1:1 square format** — optimised for Instagram
+- Painted parchment background with aged grain texture, ruled lines, and vignette
+- Epic saga title (AI-generated), winner banner, key verse moments, battle statistics
+- QR code linking to `chronowar.vercel.app` (landscape format)
+- One-click PNG download or native Web Share API (`navigator.share`)
+- X/Twitter intent fallback with pre-filled tweet text
+
+---
+
+## 🗺 Map Background System
+
+The root background dynamically transitions (1.4s ease) whenever you interact with a different realm:
+
+| Realm | Aesthetic | Palette |
+|---|---|---|
+| ⏳ Past | Aged sepia parchment | Amber/gold, ruled lines, age spots |
+| ⚔ Present | Military topo map | Muted greens, grid, contour ellipse |
+| ✧ Future | Indigo vellum blueprint | Cool purple, crosshatch, star dots |
+
+Each board also carries an inline SVG map-texture pattern overlay (no external files).
 
 ---
 
@@ -53,7 +83,7 @@ It is chess. It is a story. It is a living legend.
 | ◈ Phase Walker | Phase Walker | Diagonal slides — **phases through allied pieces** |
 
 ### 🌑 The Umbral Conclave (Black)
-Mirrors the Luminar Order with dark counterparts: Lich-Lord Vex'rath, Void Empress Nythera, Void Riders, Shadow Phasers, and the Decay Oracle.
+Mirrors the Luminar Order: Lich-Lord Vex'rath, Void Empress Nythera, Void Riders, Shadow Phasers, and the Decay Oracle.
 
 ---
 
@@ -61,44 +91,36 @@ Mirrors the Luminar Order with dark counterparts: Lich-Lord Vex'rath, Void Empre
 
 - **Kings** can move between adjacent realms (Past ↔ Present ↔ Future)
 - **Pawns** that reach the last rank can **promote** OR **cross into an adjacent realm**
-- Cross-realm moves are highlighted with a portal shimmer and trigger a transcendence narration
+- Cross-realm moves trigger a flute glissando + portal shimmer + dedicated narration
 
 ---
 
 ## 🏆 Ranking System
 
-| Rank | CP Required | Description |
-|---|---|---|
-| 🛡 Timewarden | 0 | Beginning of the journey |
-| 🏇 Chronorider | 200 | First victories across time |
-| ⚔ Realm Knight | 500 | Mastery of cross-realm tactics |
-| ✦ Sage of Ages | 1,000 | Strategic mind across timelines |
-| ◈ Phase Walker | 2,000 | Phase through opponent strategies |
-| ♛ Time Sovereign | 4,000 | Dominion over past, present, future |
-| ♔ Eternal Lord | 8,000 | Legend written in the chronicles |
+| Rank | CP Required |
+|---|---|
+| 🛡 Timewarden | 0 |
+| 🏇 Chronorider | 200 |
+| ⚔ Realm Knight | 500 |
+| ✦ Sage of Ages | 1,000 |
+| ◈ Phase Walker | 2,000 |
+| ♛ Time Sovereign | 4,000 |
+| ♔ Eternal Lord | 8,000 |
 
-### Chronicle Points (CP)
-- Capture: **+5 CP** · Cross-realm move: **+3 CP** · Check: **+8 CP** · Promotion: **+12 CP**
-- Win vs Easy: **+30 CP** · Win vs Medium: **+55 CP** · Win vs Hard: **+80 CP**
-- Win in <20 moves: **+25 CP bonus** · Every 3-win streak: **+15 CP bonus**
+**Chronicle Points:** Capture +5 · Cross-realm +3 · Check +8 · Promotion +12 · Win (Hard) +80 · Fast win (<20 moves) +25
 
 ---
 
 ## 🎻 Orchestral Audio Engine
 
-Built entirely with the **Web Audio API** — no external audio files, no dependencies.
+Pure **Web Audio API** — no external files, no dependencies.
 
-Instruments synthesized in real-time:
-- **Violin & Viola** — Sawtooth → hi-pass → formant peak → low-pass filter → vibrato LFO
-- **Cello** — Same chain, lower register, 0.6s bow attack
-- **Flute** — Pure sine + harmonic overtone + breath bandpass noise + vibrato LFO
-- **Harp** — Triangle oscillator with exponential decay (SFX layer)
-- **Hall Reverb** — 4.5-second convolver built from exponential noise impulse
-
-The score is in **D minor** and dynamically evolves across three phases:
-- 🌙 **Calm** (moves 1–10): Soft string pads, sparse flute phrases
-- ⚡ **Tension** (moves 11–20): Harp arpeggios added, fuller strings
-- 🔥 **Epic** (moves 20+/check): Full ensemble, flute plays complete phrases each chord
+- **Violin & Viola** — Sawtooth → hi-pass → formant peak → low-pass → vibrato LFO
+- **Cello** — Warm bowed bass, 0.6s bow attack
+- **Flute** — Pure sine + harmonic overtone + breath bandpass noise + vibrato
+- **Harp** — Triangle pluck with exponential decay (SFX layer)
+- **Hall Reverb** — 4.5s convolver built from exponential noise impulse response
+- **Key: D minor** — 3-phase score: Calm → Tension → Epic
 
 ---
 
@@ -108,17 +130,8 @@ The score is in **D minor** and dynamically evolves across three phases:
 git clone https://github.com/waren23greg-stack/chronowar.git
 cd chronowar
 npm install
-```
-
-Add your Anthropic API key (for AI narration):
-```bash
-# Create .env file
 echo "VITE_ANTHROPIC_API_KEY=your_key_here" > .env
-```
-
-```bash
-npm run dev     # Development server
-npm run build   # Production build
+npm run dev
 ```
 
 ---
@@ -128,34 +141,34 @@ npm run build   # Production build
 ```
 chronowar/
 ├── src/
-│   ├── engine.js          ← Full 3-realm chess logic (zero deps, pure JS)
-│   ├── ai.js              ← Minimax + alpha-beta pruning across 3 boards
-│   ├── narrative.js       ← Claude API narration per move
-│   ├── chronicle.js       ← Post-game full battle chronicle generation
-│   ├── audio.js           ← Procedural orchestral score (Web Audio API)
-│   ├── points.jsx         ← Chronicle Points, ELO, ranking system
-│   ├── pieces.jsx         ← Hand-drawn SVG chess piece components
-│   ├── App.jsx            ← Game orchestrator + state machine
-│   ├── App.css            ← Cinematic dark design system + animations
+│   ├── engine.js              ← 3-realm chess logic (pure JS, zero deps)
+│   ├── ai.js                  ← Minimax + alpha-beta across 3 boards
+│   ├── narrative.js           ← Claude API narration per move
+│   ├── chronicle.js           ← Post-game full battle chronicle
+│   ├── audio.js               ← Procedural orchestral score
+│   ├── points.jsx             ← Chronicle Points, ELO, ranking
+│   ├── pieces.jsx             ← Heraldic SVG chess pieces
+│   ├── App.jsx                ← Game orchestrator + state machine
+│   ├── App.css                ← Parchment map design system
 │   └── components/
-│       ├── LandingPage.jsx    ← Cinematic hero / feature page
+│       ├── LandingPage.jsx    ← Cinematic hero page
 │       ├── Tutorial.jsx       ← 6-step interactive guide
-│       ├── RealmBoard.jsx     ← Each time-realm board (3D perspective)
-│       ├── BoardSquare.jsx    ← Interactive square with SVG pieces
+│       ├── ChronicleCard.jsx  ← Canvas image card generator + share
+│       ├── RealmBoard.jsx     ← Map-textured realm boards (3D)
+│       ├── BoardSquare.jsx    ← Squares with heraldic SVG pieces
 │       ├── ChroniclePanel.jsx ← Typewriter narration + saga scroll
-│       └── GameOverlay.jsx    ← Cinematic checkmate/stalemate screen
+│       └── GameOverlay.jsx    ← Checkmate / stalemate screen
 ```
 
 ---
 
 ## 🗺 Roadmap
 
-- [ ] Online multiplayer (WebSockets)
-- [ ] Shareable Chronicle card (screenshot / social)
+- [ ] Online multiplayer (WebSockets — two players, shared live chronicle)
 - [ ] Global leaderboard
-- [ ] Replay viewer — watch any past game
-- [ ] Mobile-optimised layout
-- [ ] Custom piece skin packs
+- [ ] Replay viewer — scrub through any past game
+- [ ] Mobile-optimised layout (swipe between realms)
+- [ ] Piece skin packs (Egyptian, Norse, Wireframe — unlock with CP)
 
 ---
 

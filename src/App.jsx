@@ -19,6 +19,7 @@ import RealmBoard from "./components/RealmBoard";
 import ChroniclePanel, { SagaScroll, PieceLegend } from "./components/ChroniclePanel";
 import LandingPage from "./components/LandingPage";
 import Tutorial from "./components/Tutorial";
+import ChronicleCard from "./components/ChronicleCard";
 import { PointsHUD, loadStats, awardGameEnd, awardMoveEvent } from "./points.jsx";
 import "./App.css";
 
@@ -78,6 +79,12 @@ export default function App() {
   const [showChronicle, setShowChronicle]         = useState(false);
   const [chronicleData, setChronicleData]         = useState(null);
   const [chronicleLoading, setChronicleLoading]   = useState(false);
+  const [showCard, setShowCard]                   = useState(false);
+
+  // Game stat trackers for the card
+  const captureCount  = useRef(0);
+  const crossRealmCount = useRef(0);
+  const checkCount    = useRef(0);
 
   // ── Game over overlay ──
   const [showOver, setShowOver]   = useState(false);
@@ -143,12 +150,14 @@ export default function App() {
     // ── Audio ──
     if (capPiece) {
       totalCaptures.current += 1;
+      captureCount.current  += 1;
       if (isCrossRealm) sfxRealmTranscend(); else sfxCapture();
     } else if (isCrossRealm) {
       sfxRealmTranscend();
     } else {
       sfxMove(false, false);
     }
+    if (isCrossRealm) crossRealmCount.current += 1;
 
     if (capPiece)
       setCaptured(prev => ({ ...prev, [isW(capPiece) ? "white" : "black"]: [...prev[isW(capPiece) ? "white" : "black"], capPiece] }));
@@ -187,6 +196,7 @@ export default function App() {
       if (endGain > 0) awardFlash(endGain);
     } else if (newStatus === "check") {
       sfxCheck();
+      checkCount.current += 1;
     }
     if (promo) setTimeout(() => sfxPromotion(), 150);
 
@@ -280,6 +290,9 @@ export default function App() {
     setMoveNum(0); setLastMove(null);
     setStoryLog([]); storyCtx.current = [];
     totalCaptures.current = 0;
+    captureCount.current  = 0;
+    crossRealmCount.current = 0;
+    checkCount.current    = 0;
     updateMusicFromGame(0, "playing", 0);
     setNarr("A new war begins. The armies assume their eternal positions once more — let the chronicles be written anew…");
     setNarrating(false); setAiThinking(false); setAiTaunt("");
@@ -399,7 +412,7 @@ export default function App() {
               <button onClick={openChronicle} className="cw-chronicle-btn">
                 📖 READ THE FULL CHRONICLE
               </button>
-              <button onClick={reset} className="cw-reset-btn" style={{marginTop:10}}>
+              <button onClick={reset} className="cw-reset-btn" style={{marginTop:6}}>
                 ↺ FIGHT AGAIN
               </button>
             </div>
@@ -434,15 +447,38 @@ export default function App() {
                 Close & Fight Again
               </button>
               {!chronicleLoading && (
-                <button
-                  onClick={() => navigator.clipboard?.writeText(`${chronicleData?.title}\n\n${chronicleData?.body}`).catch(()=>{})}
-                  className="cw-chronicle-copy">
-                  Copy Chronicle
-                </button>
+                <>
+                  <button
+                    onClick={() => navigator.clipboard?.writeText(`${chronicleData?.title}\n\n${chronicleData?.body}`).catch(()=>{})}
+                    className="cw-chronicle-copy">
+                    Copy Chronicle
+                  </button>
+                  <button
+                    onClick={() => setShowCard(true)}
+                    className="cw-chronicle-btn"
+                    style={{ fontSize: ".6rem", padding: "9px 18px", letterSpacing: "2px" }}>
+                    🖼 CREATE SHARE CARD
+                  </button>
+                </>
               )}
             </div>
           </div>
         </div>
+      )}
+      {showCard && chronicleData && (
+        <ChronicleCard
+          data={{
+            title:      chronicleData.title,
+            winner:     turn === "white" ? "Umbral Conclave" : "Luminar Order",
+            moveCount:  moveNum,
+            captures:   captureCount.current,
+            crossRealm: crossRealmCount.current,
+            checks:     checkCount.current,
+            cpEarned:   stats.cp,
+            moments:    storyLog.slice(0, 5).map(e => e.t),
+          }}
+          onClose={() => setShowCard(false)}
+        />
       )}
       {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
     </div>
