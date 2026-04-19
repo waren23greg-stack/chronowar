@@ -1,467 +1,272 @@
 // ============================================================
-//  CHRONOWAR — CINEMATIC AUDIO ENGINE
-//  Procedural orchestral score inspired by Hans Zimmer /
-//  Two Steps From Hell / Audiomachine.
-//  Pure Web Audio API — zero external deps.
+//  CHRONOWAR — ORCHESTRAL AUDIO ENGINE v3
+//  Instrumentation: Violin · Viola · Cello · Flute · Harp
+//  Mood: Cinematic, calm, deeply atmospheric
+//  Key: D minor — warm, melancholic, ancient
 // ============================================================
 
 let ctx = null;
 let masterGain = null;
 let musicGain  = null;
 let sfxGain    = null;
-let reverbNode = null;
-let isRunning  = false;
-let musicPhase = "calm"; // calm | tension | epic | finale
+let reverb     = null;
+let musicPhase = "calm";
+let chordIdx   = 0;
+let _muted     = false;
 
-// ── Boot AudioContext on first user gesture ─────────────────
+const F = {
+  D2:73.42, A2:110, C3:130.81, D3:146.83, E3:164.81,
+  F3:174.61, G3:196, A3:220, Bb3:233.08, C4:261.63,
+  D4:293.66, E4:329.63, F4:349.23, G4:392, A4:440,
+  Bb4:466.16, C5:523.25, D5:587.33, E5:659.25, F5:698.46,
+  G5:784, A5:880, C6:1046.5,
+};
+
+// ─── Boot ────────────────────────────────────────────────
 export function bootAudio() {
-  if (ctx) return ctx;
+  if (ctx) { if (ctx.state === "suspended") ctx.resume(); return ctx; }
   ctx = new (window.AudioContext || window.webkitAudioContext)();
-
-  masterGain = ctx.createGain();
-  masterGain.gain.setValueAtTime(0.82, ctx.currentTime);
-  masterGain.connect(ctx.destination);
-
-  musicGain = ctx.createGain();
-  musicGain.gain.setValueAtTime(0.55, ctx.currentTime);
-  musicGain.connect(masterGain);
-
-  sfxGain = ctx.createGain();
-  sfxGain.gain.setValueAtTime(0.9, ctx.currentTime);
-  sfxGain.connect(masterGain);
-
-  reverbNode = buildReverb(3.2, 0.6);
-
-  startCinematicScore();
+  masterGain = ctx.createGain(); masterGain.gain.value = 0.78; masterGain.connect(ctx.destination);
+  musicGain  = ctx.createGain(); musicGain.gain.value  = 0.42; musicGain.connect(masterGain);
+  sfxGain    = ctx.createGain(); sfxGain.gain.value    = 0.72; sfxGain.connect(masterGain);
+  reverb = buildReverb(4.5, 0.55);
+  startScore();
   return ctx;
-}
-
-export function setMusicPhase(phase) {
-  if (phase !== musicPhase) {
-    musicPhase = phase;
-  }
 }
 
 export function setMasterVolume(v) {
   if (!masterGain) return;
-  masterGain.gain.linearRampToValueAtTime(v, ctx.currentTime + 0.4);
+  _muted = v === 0;
+  masterGain.gain.linearRampToValueAtTime(v, ctx.currentTime + 0.5);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  REVERB — impulse‑response convolver built from noise
-// ─────────────────────────────────────────────────────────────
-function buildReverb(duration = 3, decay = 0.7) {
-  const convolver = ctx.createConvolver();
-  const sampleRate = ctx.sampleRate;
-  const length = sampleRate * duration;
-  const impulse = ctx.createBuffer(2, length, sampleRate);
+export function setMusicPhase(p) { musicPhase = p; }
+
+// ─── Reverb ──────────────────────────────────────────────
+function buildReverb(dur, decay) {
+  const conv = ctx.createConvolver();
+  const sr = ctx.sampleRate, len = sr * dur;
+  const buf = ctx.createBuffer(2, len, sr);
   for (let c = 0; c < 2; c++) {
-    const ch = impulse.getChannelData(c);
-    for (let i = 0; i < length; i++) {
-      ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
-    }
+    const ch = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
   }
-  convolver.buffer = impulse;
-  convolver.connect(masterGain);
-  return convolver;
+  conv.buffer = buf; conv.connect(masterGain); return conv;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  UTILITY — create oscillator with ADSR
-// ─────────────────────────────────────────────────────────────
-function osc(freq, type = "sine", attack = 0.02, decay = 0.1, sustain = 0.7, release = 0.4, duration = 0.6, destination = masterGain, detune = 0) {
+// ─── Violin/Viola — bowed string ─────────────────────────
+function violin(freq, duration = 2.5, vol = 0.07, vibDepth = 4, vibRate = 5.5, attack = 0.38, detune = 0) {
   if (!ctx) return;
-  const o = ctx.createOscillator();
+  const t = ctx.currentTime;
+  const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
+  lfo.frequency.value = vibRate; lfoG.gain.value = vibDepth; lfo.connect(lfoG);
+  const osc = ctx.createOscillator();
+  osc.type = "sawtooth"; osc.frequency.value = freq; osc.detune.value = detune;
+  lfoG.connect(osc.frequency);
+  const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 200;
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass";  lp.frequency.value = 2600; lp.Q.value = 0.7;
+  const pk = ctx.createBiquadFilter(); pk.type = "peaking";  pk.frequency.value = 800; pk.gain.value = 3; pk.Q.value = 1.2;
   const g = ctx.createGain();
-  o.type = type;
-  o.frequency.setValueAtTime(freq, ctx.currentTime);
-  if (detune) o.detune.setValueAtTime(detune, ctx.currentTime);
-  o.connect(g);
-  g.connect(destination);
-  g.gain.setValueAtTime(0, ctx.currentTime);
-  g.gain.linearRampToValueAtTime(sustain, ctx.currentTime + attack);
-  g.gain.linearRampToValueAtTime(sustain * 0.75, ctx.currentTime + attack + decay);
-  g.gain.setValueAtTime(sustain * 0.75, ctx.currentTime + duration - release);
-  g.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-  o.start(ctx.currentTime);
-  o.stop(ctx.currentTime + duration);
+  osc.connect(hp); hp.connect(pk); pk.connect(lp); lp.connect(g);
+  const dry = ctx.createGain(); dry.gain.value = 0.55;
+  const wet = ctx.createGain(); wet.gain.value = 0.45;
+  g.connect(dry); dry.connect(musicGain); g.connect(wet); wet.connect(reverb);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + attack);
+  g.gain.setValueAtTime(vol * 0.88, t + duration - 0.7);
+  g.gain.linearRampToValueAtTime(0, t + duration);
+  lfo.start(t); lfo.stop(t + duration);
+  osc.start(t); osc.stop(t + duration);
 }
 
-// send signal through reverb as well
-function oscReverb(freq, type, attack, decay, sustain, release, duration, gain = 0.3, detune = 0) {
+// ─── Cello ───────────────────────────────────────────────
+function cello(freq, duration = 3.5, vol = 0.07, attack = 0.5) {
+  violin(freq, duration, vol, 2.2, 4.0, attack, 0);
+}
+
+// ─── Flute — pure sine + breath + vibrato ────────────────
+function flute(freq, duration = 2.0, vol = 0.052, delay = 0) {
   if (!ctx) return;
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = type;
-  o.frequency.setValueAtTime(freq, ctx.currentTime);
-  if (detune) o.detune.setValueAtTime(detune, ctx.currentTime);
-  o.connect(g);
-  const dryG = ctx.createGain();
-  dryG.gain.setValueAtTime(gain * 0.6, ctx.currentTime);
-  const wetG = ctx.createGain();
-  wetG.gain.setValueAtTime(gain * 0.4, ctx.currentTime);
-  g.connect(dryG);
-  dryG.connect(masterGain);
-  g.connect(wetG);
-  wetG.connect(reverbNode);
-  g.gain.setValueAtTime(0, ctx.currentTime);
-  g.gain.linearRampToValueAtTime(1, ctx.currentTime + attack);
-  g.gain.linearRampToValueAtTime(0.75, ctx.currentTime + attack + decay);
-  g.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-  o.start(ctx.currentTime);
-  o.stop(ctx.currentTime + duration);
+  const t = ctx.currentTime + delay;
+  const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
+  lfo.frequency.value = 5.9; lfoG.gain.value = 3.2;
+  lfo.connect(lfoG);
+  const osc = ctx.createOscillator(); osc.type = "sine"; osc.frequency.value = freq;
+  lfoG.connect(osc.frequency);
+  const osc2 = ctx.createOscillator(); osc2.type = "sine"; osc2.frequency.value = freq * 2;
+  const g1 = ctx.createGain(); g1.gain.value = 0.82;
+  const g2 = ctx.createGain(); g2.gain.value = 0.12;
+  osc.connect(g1); osc2.connect(g2);
+  const mix = ctx.createGain(); g1.connect(mix); g2.connect(mix);
+  // Breath
+  const nLen = Math.ceil(ctx.sampleRate * duration);
+  const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+  const nd = nBuf.getChannelData(0);
+  for (let i = 0; i < nLen; i++) nd[i] = (Math.random() * 2 - 1) * 0.015;
+  const nSrc = ctx.createBufferSource(); nSrc.buffer = nBuf;
+  const nbp = ctx.createBiquadFilter(); nbp.type = "bandpass"; nbp.frequency.value = freq; nbp.Q.value = 9;
+  nSrc.connect(nbp); nbp.connect(mix);
+  const gMain = ctx.createGain();
+  mix.connect(gMain);
+  const dry = ctx.createGain(); dry.gain.value = 0.5;
+  const wet = ctx.createGain(); wet.gain.value = 0.5;
+  gMain.connect(dry); dry.connect(musicGain); gMain.connect(wet); wet.connect(reverb);
+  gMain.gain.setValueAtTime(0, t);
+  gMain.gain.linearRampToValueAtTime(vol, t + 0.18);
+  gMain.gain.setValueAtTime(vol, t + duration - 0.35);
+  gMain.gain.linearRampToValueAtTime(0, t + duration);
+  lfo.start(t); lfo.stop(t + duration);
+  osc.start(t); osc.stop(t + duration);
+  osc2.start(t); osc2.stop(t + duration);
+  nSrc.start(t); nSrc.stop(t + duration);
 }
 
-// White noise burst
-function noise(duration = 0.08, gainVal = 0.18, lpFreq = 4000) {
+// ─── Harp — triangle pluck ───────────────────────────────
+function harp(freq, duration = 1.6, vol = 0.055, delay = 0) {
   if (!ctx) return;
-  const bufLen = ctx.sampleRate * duration;
-  const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.setValueAtTime(lpFreq, ctx.currentTime);
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(gainVal, ctx.currentTime);
-  g.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-  src.connect(lp);
-  lp.connect(g);
-  g.connect(sfxGain);
-  src.start();
-  src.stop(ctx.currentTime + duration);
+  const t = ctx.currentTime + delay;
+  const osc = ctx.createOscillator(); osc.type = "triangle"; osc.frequency.value = freq;
+  const osc2 = ctx.createOscillator(); osc2.type = "sine"; osc2.frequency.value = freq * 2;
+  const g1 = ctx.createGain(); g1.gain.value = 0.76;
+  const g2 = ctx.createGain(); g2.gain.value = 0.24;
+  osc.connect(g1); osc2.connect(g2);
+  const gMain = ctx.createGain();
+  g1.connect(gMain); g2.connect(gMain);
+  const wet = ctx.createGain(); wet.gain.value = 0.55;
+  gMain.connect(sfxGain); gMain.connect(wet); wet.connect(reverb);
+  gMain.gain.setValueAtTime(vol, t);
+  gMain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  osc.start(t); osc.stop(t + duration);
+  osc2.start(t); osc2.stop(t + duration);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  MUSIC SYSTEM — layered procedural score
-// ─────────────────────────────────────────────────────────────
-
-// Scale / chord definitions (all in Hz, based on D minor / D Aeolian — Zimmer's favourite)
-const NOTES = {
-  D2: 73.42, A2: 110,   C3: 130.81, D3: 146.83, E3: 164.81,
-  F3: 174.61, G3: 196,  A3: 220,    Bb3: 233.08, C4: 261.63,
-  D4: 293.66, E4: 329.63, F4: 349.23, G4: 392,  A4: 440,
-  C5: 523.25, D5: 587.33, F5: 698.46, G5: 784,  A5: 880,
-};
-
-// Chord voicings
+// ─── Score chords ─────────────────────────────────────────
 const CHORDS = {
-  Dm: [NOTES.D2, NOTES.A2, NOTES.D3, NOTES.F3, NOTES.A3],
-  F:  [NOTES.C3, NOTES.F3, NOTES.A3, NOTES.C4],
-  Gm: [NOTES.G3, NOTES.Bb3, NOTES.D4, NOTES.G4],
-  Bb: [NOTES.F3, NOTES.Bb3, NOTES.D4, NOTES.F4],
-  Am: [NOTES.A2, NOTES.E3, NOTES.A3, NOTES.C4],
-  C:  [NOTES.C3, NOTES.E3, NOTES.G3, NOTES.C4],
+  Dm: [F.D3,F.F3,F.A3,F.D4,F.F4,F.A4],
+  Gm: [F.G3,F.Bb3,F.D4,F.G4,F.Bb4],
+  Bb: [F.F3,F.Bb3,F.D4,F.F4],
+  F:  [F.F3,F.A3,F.C4,F.F4,F.A4],
+  Am: [F.A3,F.C4,F.E4,F.A4],
+  C:  [F.C3,F.E3,F.G3,F.C4],
+};
+const FLUTE_LINES = {
+  Dm:[F.F5,F.E5,F.D5,F.A5], Gm:[F.G5,F.F5,F.D5,F.Bb4],
+  Bb:[F.D5,F.F5,F.Bb4,F.D5], F:[F.C5,F.A4,F.F5,F.C5],
+  Am:[F.E5,F.C5,F.A4,F.E5], C:[F.E5,F.G5,F.C5,F.E5],
+};
+const PROGS = {
+  calm:    ["Dm","F","Gm","Bb"],
+  tension: ["Dm","Am","Gm","C"],
+  epic:    ["Dm","Gm","Bb","Dm"],
 };
 
-const PROG_CALM    = ["Dm", "F",  "Gm", "Bb"];
-const PROG_TENSION = ["Dm", "Am", "Gm", "C"];
-const PROG_EPIC    = ["Dm", "Gm", "Bb", "F"];
-
-let chordIdx = 0;
-let musicTimer = null;
-
-function playStringPad(chord, duration = 4.5, vol = 0.07) {
-  if (!ctx || !chord) return;
-  chord.forEach((freq, i) => {
-    const detune = (i % 2 === 0 ? 1 : -1) * (3 + Math.random() * 4);
-    // sawtooth gives string-like overtones, filtered down
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.setValueAtTime(600 + i * 200, ctx.currentTime);
-    o.type = "sawtooth";
-    o.frequency.setValueAtTime(freq, ctx.currentTime);
-    o.detune.setValueAtTime(detune, ctx.currentTime);
-    o.connect(lp); lp.connect(g);
-    const dry = ctx.createGain(); dry.gain.setValueAtTime(0.55, ctx.currentTime);
-    const wet = ctx.createGain(); wet.gain.setValueAtTime(0.45, ctx.currentTime);
-    g.connect(dry); dry.connect(musicGain);
-    g.connect(wet); wet.connect(reverbNode);
-    g.gain.setValueAtTime(0, ctx.currentTime);
-    g.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.8);
-    g.gain.setValueAtTime(vol, ctx.currentTime + duration - 0.9);
-    g.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-    o.start(ctx.currentTime);
-    o.stop(ctx.currentTime + duration);
+function playChord(name, dur) {
+  const notes = CHORDS[name] || CHORDS.Dm;
+  const isEpic = musicPhase === "epic";
+  const isTens = musicPhase === "tension";
+  // Cello foundation
+  cello(notes[0] * 0.5, dur, isEpic ? 0.09 : 0.065, 0.6);
+  cello(notes[1] * 0.5, dur, 0.05, 0.65);
+  // Viola middle
+  notes.slice(1, 4).forEach((n, i) =>
+    violin(n, dur, isEpic ? 0.062 : 0.045, 3.5+i*0.3, 5.2, 0.42+i*0.06, i*4));
+  // Violin upper
+  notes.slice(3).forEach((n, i) => {
+    violin(n, dur, isEpic ? 0.048 : 0.033, 4.5+i*0.4, 5.8, 0.52+i*0.05, -i*5);
+    violin(n, dur, isEpic ? 0.028 : 0.018, 4.0, 5.4, 0.58, 14+i*3);
   });
-}
-
-function playBrassStab(freq, delay = 0) {
-  if (!ctx) return;
-  [0, 7, 12].forEach((semitones, i) => {
-    const f = freq * Math.pow(2, semitones / 12);
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.setValueAtTime(1200, ctx.currentTime + delay);
-    lp.frequency.linearRampToValueAtTime(2400, ctx.currentTime + delay + 0.15);
-    o.type = "sawtooth";
-    o.frequency.setValueAtTime(f, ctx.currentTime + delay);
-    o.connect(lp); lp.connect(g);
-    g.connect(musicGain);
-    g.gain.setValueAtTime(0, ctx.currentTime + delay);
-    g.gain.linearRampToValueAtTime(0.09 - i * 0.02, ctx.currentTime + delay + 0.05);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.45);
-    o.start(ctx.currentTime + delay);
-    o.stop(ctx.currentTime + delay + 0.5);
-  });
-}
-
-function playPercussion(delay = 0) {
-  if (!ctx) return;
-  // Timpani-like
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = "sine";
-  o.frequency.setValueAtTime(80, ctx.currentTime + delay);
-  o.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + delay + 0.4);
-  o.connect(g); g.connect(musicGain);
-  g.gain.setValueAtTime(0, ctx.currentTime + delay);
-  g.gain.linearRampToValueAtTime(0.25, ctx.currentTime + delay + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.6);
-  o.start(ctx.currentTime + delay);
-  o.stop(ctx.currentTime + delay + 0.7);
-  // Snare noise hit
-  noise(0.12, 0.12, 3000);
-}
-
-function getMusicBeat() {
-  const prog = musicPhase === "tension" ? PROG_TENSION
-             : musicPhase === "epic"    ? PROG_EPIC
-             : PROG_CALM;
-  const chordName = prog[chordIdx % prog.length];
-  const chord = CHORDS[chordName];
-  const dur = musicPhase === "calm" ? 5.5 : musicPhase === "tension" ? 4.0 : 3.0;
-  chordIdx++;
-  return { chord, dur, chordName };
+  // Flute
+  const line = FLUTE_LINES[name] || FLUTE_LINES.Dm;
+  if (isEpic) {
+    line.forEach((n, i) => flute(n, dur / line.length + 0.15, 0.05, (dur / line.length) * i));
+  } else if (Math.random() > 0.3) {
+    flute(line[Math.floor(Math.random() * line.length)], dur * 0.55, 0.042, 0.3 + Math.random() * 0.6);
+  }
+  // Harp arpeggios on tension
+  if (isTens) notes.slice(0, 4).forEach((n, i) => harp(n, dur * 0.45, 0.036, i * 0.18));
 }
 
 function musicLoop() {
-  if (!ctx) return;
-  const { chord, dur } = getMusicBeat();
-  const vol = musicPhase === "calm" ? 0.055 : musicPhase === "tension" ? 0.07 : 0.09;
-  playStringPad(chord, dur, vol);
-
-  if (musicPhase === "epic") {
-    playBrassStab(chord[0], 0.1);
-    playBrassStab(chord[2], 0.7);
-    playPercussion(0);
-    playPercussion(1.5);
-  } else if (musicPhase === "tension") {
-    playBrassStab(chord[0], 0.2);
-    playPercussion(dur * 0.5);
-  } else {
-    // calm — occasional very soft brass
-    if (chordIdx % 3 === 0) playBrassStab(chord[0] * 0.5, 1.0);
-  }
-
-  musicTimer = setTimeout(musicLoop, (dur - 0.3) * 1000);
+  if (!ctx) { setTimeout(musicLoop, 5000); return; }
+  const prog = PROGS[musicPhase] || PROGS.calm;
+  const name = prog[chordIdx % prog.length];
+  const dur  = musicPhase === "calm" ? 6.5 : musicPhase === "tension" ? 5.0 : 4.2;
+  chordIdx++;
+  if (!_muted) playChord(name, dur);
+  setTimeout(musicLoop, (dur - 0.5) * 1000);
 }
 
-function startCinematicScore() {
-  if (isRunning) return;
-  isRunning = true;
-  // Fade-in delay
-  setTimeout(() => {
-    musicLoop();
-  }, 800);
-}
+function startScore() { setTimeout(musicLoop, 1400); }
 
-// ─────────────────────────────────────────────────────────────
-//  SOUND EFFECTS — one function per game event
-// ─────────────────────────────────────────────────────────────
-
+// ─── SFX ────────────────────────────────────────────────
 export function sfxMove(isCapture = false, isCrossRealm = false) {
   if (!ctx) return;
-  if (isCrossRealm) {
-    sfxRealmTranscend();
-    return;
-  }
-  if (isCapture) {
-    sfxCapture();
-    return;
-  }
-  // Wooden piece thock — impact + resonance
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = "sine";
-  o.frequency.setValueAtTime(320, ctx.currentTime);
-  o.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.07);
-  o.connect(g); g.connect(sfxGain);
-  g.gain.setValueAtTime(0.35, ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-  o.start(); o.stop(ctx.currentTime + 0.15);
-  noise(0.04, 0.09, 5000);
+  if (isCrossRealm) { sfxRealmTranscend(); return; }
+  if (isCapture)    { sfxCapture();        return; }
+  harp(F.A4, 0.85, 0.05, 0);
+  harp(F.E5, 0.65, 0.026, 0.045);
 }
 
 export function sfxCapture() {
   if (!ctx) return;
-  // Impact crash — rising dissonance
-  [1, 1.26, 1.587, 2].forEach((ratio, i) => {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = i < 2 ? "sawtooth" : "square";
-    o.frequency.setValueAtTime(90 * ratio, ctx.currentTime);
-    o.frequency.exponentialRampToValueAtTime(45 * ratio, ctx.currentTime + 0.5);
-    o.connect(g);
-    const wet = ctx.createGain(); wet.gain.setValueAtTime(0.3, ctx.currentTime);
-    g.connect(sfxGain); g.connect(wet); wet.connect(reverbNode);
-    g.gain.setValueAtTime(0, ctx.currentTime);
-    g.gain.linearRampToValueAtTime(0.18 - i * 0.03, ctx.currentTime + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
-    o.start(); o.stop(ctx.currentTime + 0.6);
-  });
-  noise(0.15, 0.22, 6000);
-  // Metal sting
-  setTimeout(() => {
-    osc(880, "triangle", 0.005, 0.05, 0.3, 0.2, 0.4, sfxGain);
-    osc(1108, "triangle", 0.005, 0.05, 0.2, 0.2, 0.35, sfxGain);
-  }, 80);
+  violin(F.A4, 0.55, 0.065, 8, 6.5, 0.04);
+  violin(F.Bb3, 0.5,  0.052, 6, 6,   0.05);
+  harp(F.D4, 1.0, 0.045, 0.38);
 }
 
 export function sfxRealmTranscend() {
   if (!ctx) return;
-  // Whoosh sweep + harmonic shimmer (portal opening)
-  // Frequency sweep up
-  const sweep = ctx.createOscillator();
-  const sweepG = ctx.createGain();
-  sweep.type = "sine";
-  sweep.frequency.setValueAtTime(80, ctx.currentTime);
-  sweep.frequency.exponentialRampToValueAtTime(2400, ctx.currentTime + 0.7);
-  sweep.connect(sweepG); sweepG.connect(sfxGain);
-  sweepG.gain.setValueAtTime(0, ctx.currentTime);
-  sweepG.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.1);
-  sweepG.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.7);
-  sweep.start(); sweep.stop(ctx.currentTime + 0.75);
-  // Harmonic shimmer
-  [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((freq, i) => {
-    setTimeout(() => {
-      oscReverb(freq, "triangle", 0.01, 0.1, 0.4, 0.3, 0.9, 0.18, (i % 2 === 0 ? 8 : -8));
-    }, i * 60);
-  });
-  // Low ethereal drone
-  oscReverb(NOTES.D2, "sine", 0.05, 0.1, 0.5, 0.4, 1.2, 0.2);
+  [F.D4,F.F4,F.A4,F.D5,F.F5,F.A5].forEach((f, i) => flute(f, 0.55, 0.048+i*0.004, i * 0.1));
+  [F.A5,F.C6,F.A5].forEach((f, i) => violin(f, 1.6, 0.022, 6, 7, 0.3, i*8));
+  [F.D4,F.F4,F.A4,F.D5].forEach((f, i) => harp(f, 1.3, 0.04, i * 0.09));
 }
 
 export function sfxCheck() {
   if (!ctx) return;
-  // Alarm brass stab — rising 3 note sting
-  const intervals = [0, 0.18, 0.36];
-  const freqs     = [NOTES.A3, NOTES.C4, NOTES.E4];
-  intervals.forEach((delay, i) => {
-    setTimeout(() => {
-      playBrassStab(freqs[i] * 0.5, 0);
-      oscReverb(freqs[i], "sawtooth", 0.01, 0.05, 0.5, 0.15, 0.35, 0.22);
-    }, delay * 1000);
-  });
-  // Low rumble
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = "sine";
-  o.frequency.setValueAtTime(55, ctx.currentTime);
-  o.connect(g); g.connect(sfxGain);
-  g.gain.setValueAtTime(0, ctx.currentTime);
-  g.gain.linearRampToValueAtTime(0.28, ctx.currentTime + 0.05);
-  g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.8);
-  o.start(); o.stop(ctx.currentTime + 0.85);
+  violin(F.E5, 0.7, 0.075, 5, 6, 0.04);
+  setTimeout(() => { violin(F.F5, 1.1, 0.07, 5, 6, 0.04); flute(F.F5, 0.8, 0.048); }, 260);
+  cello(F.D2, 1.4, 0.058, 0.07);
 }
 
 export function sfxCheckmate() {
   if (!ctx) return;
-  // EPIC FINALE — Hans Zimmer INCEPTION "BRAAAM" style
-  // Deep bass hit
-  [36.71, 55, 73.42].forEach((freq, i) => {
-    setTimeout(() => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "sawtooth";
-      o.frequency.setValueAtTime(freq, ctx.currentTime);
-      const lp = ctx.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.frequency.setValueAtTime(400, ctx.currentTime);
-      o.connect(lp); lp.connect(g);
-      const wet = ctx.createGain(); wet.gain.setValueAtTime(0.5, ctx.currentTime);
-      g.connect(sfxGain); g.connect(wet); wet.connect(reverbNode);
-      g.gain.setValueAtTime(0, ctx.currentTime);
-      g.gain.linearRampToValueAtTime(0.4 - i * 0.08, ctx.currentTime + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.5);
-      o.start(); o.stop(ctx.currentTime + 2.8);
-    }, i * 120);
-  });
-  // Rising brass fanfare
-  const fanfareNotes = [NOTES.D3, NOTES.F3, NOTES.A3, NOTES.D4, NOTES.F4, NOTES.A4];
-  fanfareNotes.forEach((freq, i) => {
-    setTimeout(() => {
-      oscReverb(freq, "sawtooth", 0.03, 0.1, 0.6, 0.3, 0.8, 0.25, i % 2 === 0 ? 5 : -5);
-    }, 300 + i * 130);
-  });
-  // Timpani rolls
-  [0, 0.5, 1.0, 1.5, 2.0].forEach(t => {
-    setTimeout(() => playPercussion(0), t * 1000);
-  });
-  // High choir shimmer
-  setTimeout(() => {
-    [523.25, 659.25, 783.99].forEach((freq, i) => {
-      oscReverb(freq, "triangle", 0.2, 0.3, 0.7, 0.8, 3.0, 0.15, i * 5);
-    });
-  }, 1000);
+  cello(F.D2, 4.2, 0.10, 0.28); cello(F.A2, 4.0, 0.082, 0.34);
+  [F.D3,F.F3,F.A3,F.D4,F.F4].forEach((f, i) => violin(f, 3.8, 0.068-i*0.006, 5, 5.5, 0.42+i*0.08, i*5));
+  [F.A4,F.D5,F.F5].forEach((f, i) => violin(f, 3.4, 0.048, 5.5, 5.8, 0.55+i*0.1, -i*6));
+  [F.D4,F.F4,F.A4,F.D5,F.F5,F.A5].forEach((f, i) => flute(f, 0.65, 0.058, 0.65+i*0.27));
+  [F.D4,F.F4,F.A4,F.D5,F.F5,F.D5,F.A4,F.F4].forEach((f, i) => harp(f, 1.7, 0.042, 0.4+i*0.14));
 }
 
 export function sfxGameStart() {
   if (!ctx) return;
-  // Ceremonial low gong + horn call
-  oscReverb(NOTES.D2, "sine", 0.01, 0.2, 0.6, 1.5, 3.0, 0.35);
-  oscReverb(NOTES.A2, "sine", 0.01, 0.2, 0.5, 1.5, 2.5, 0.28);
+  [F.D3,F.F3,F.A3,F.D4,F.F4,F.A4,F.D5].forEach((f, i) => harp(f, 2.4-i*0.18, 0.052, i*0.13));
   setTimeout(() => {
-    playBrassStab(NOTES.D3 * 0.5, 0);
-    playBrassStab(NOTES.F3 * 0.5, 0.25);
-    playBrassStab(NOTES.A3 * 0.5, 0.5);
-  }, 500);
-  noise(0.3, 0.08, 2000);
+    cello(F.D2, 3.5, 0.072, 0.6);
+    violin(F.A4, 2.8, 0.052, 4, 5.5, 0.52);
+    flute(F.D5, 2.6, 0.048);
+  }, 950);
 }
 
 export function sfxPromotion() {
   if (!ctx) return;
-  // Ascending fanfare — triumph
-  const ascend = [NOTES.D4, NOTES.F4, NOTES.A4, NOTES.D5];
-  ascend.forEach((freq, i) => {
-    setTimeout(() => {
-      oscReverb(freq, "triangle", 0.02, 0.05, 0.6, 0.3, 0.7, 0.25);
-      osc(freq * 2, "sine", 0.02, 0.05, 0.3, 0.3, 0.5, sfxGain);
-    }, i * 100);
-  });
+  [F.D5,F.F5,F.A5,F.D5,F.A5].forEach((f, i) => flute(f, 0.52, 0.058, i*0.17));
+  [F.D4,F.A4,F.D5].forEach((f, i) => harp(f, 1.1, 0.042, i*0.1));
 }
 
 export function sfxAiThinking() {
   if (!ctx) return;
-  // Subtle pulsing low tone — menacing
-  oscReverb(NOTES.D2 * 0.5, "sine", 0.1, 0.2, 0.3, 0.5, 1.2, 0.12);
+  cello(F.D2 * 0.5, 1.7, 0.036, 0.85);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  MUSIC PHASE AUTO-MANAGEMENT
-// ─────────────────────────────────────────────────────────────
-export function updateMusicFromGame(moveNum, status, captureCount) {
+export function updateMusicFromGame(moveNum, status, captures) {
   if (!ctx) return;
   if (status === "checkmate" || status === "stalemate") {
-    setMusicPhase("finale");
-    musicGain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 2);
-    return;
+    musicGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 3); return;
   }
-  if (status === "check") {
-    setMusicPhase("epic");
-    return;
-  }
-  if (moveNum > 25 || captureCount > 8) {
-    setMusicPhase("epic");
-  } else if (moveNum > 12 || captureCount > 3) {
-    setMusicPhase("tension");
-  } else {
-    setMusicPhase("calm");
-  }
+  musicPhase = status === "check"           ? "tension"
+             : moveNum > 20 || captures > 6 ? "epic"
+             : moveNum > 10 || captures > 2 ? "tension"
+             : "calm";
+  const vol = musicPhase === "calm" ? 0.42 : musicPhase === "tension" ? 0.50 : 0.57;
+  musicGain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 2.5);
 }
