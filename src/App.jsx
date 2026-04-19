@@ -17,6 +17,9 @@ import {
 } from "./audio";
 import RealmBoard from "./components/RealmBoard";
 import ChroniclePanel, { SagaScroll, PieceLegend } from "./components/ChroniclePanel";
+import LandingPage from "./components/LandingPage";
+import Tutorial from "./components/Tutorial";
+import { PointsHUD, loadStats, awardGameEnd, awardMoveEvent } from "./points.jsx";
 import "./App.css";
 
 const STARS = Array.from({ length: 65 }, (_, i) => ({
@@ -77,6 +80,15 @@ export default function App() {
 
   // ── Game over overlay ──
   const [showOver, setShowOver]   = useState(false);
+
+  // ── Screen state ──
+  const [screen, setScreen]         = useState("landing"); // "landing" | "game"
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // ── Points ──
+  const [stats, setStats]         = useState(() => loadStats());
+  const [lastAward, setLastAward] = useState(null);
+  const awardFlash = (pts) => { setLastAward(pts); setTimeout(() => setLastAward(null), 1600); };
 
   // ── Refs to avoid stale closures ──
   const boardsRef     = useRef(boards);
@@ -165,6 +177,13 @@ export default function App() {
     if (newStatus === "checkmate" || newStatus === "stalemate") {
       setTimeout(() => sfxCheckmate(), 200);
       setTimeout(() => setShowOver(true), 1800);
+      // Award game-end points
+      const result = newStatus === "stalemate" ? "draw"
+                   : (isW(movePiece) ? "white" : "black") === currentTurn ? "win" : "loss";
+      const endStats = awardGameEnd(stats, { result, difficulty, moveCount: num, mode });
+      const endGain = endStats.cp - stats.cp;
+      setStats(endStats);
+      if (endGain > 0) awardFlash(endGain);
     } else if (newStatus === "check") {
       sfxCheck();
     }
@@ -172,6 +191,20 @@ export default function App() {
 
     // ── Update music phase ──
     updateMusicFromGame(num, newStatus, totalCaptures.current);
+
+    // ── Award move points ──
+    const awardedStats = awardMoveEvent(stats, {
+      captures: capPiece ? 1 : 0,
+      crossRealm: isCrossRealm,
+      check: newCheck,
+      promotion: promo,
+    });
+    const gained =
+      (capPiece ? 5 : 0) +
+      (isCrossRealm ? 3 : 0) +
+      (newCheck ? 8 : 0) +
+      (promo ? 12 : 0);
+    if (gained > 0) { setStats(awardedStats); awardFlash(gained); }
 
     return { nb, newTurn, num, newStatus };
   }, [doNarration]);
@@ -259,6 +292,10 @@ export default function App() {
     aiThinking             ? aiTaunt || "…" :
     `Move ${moveNum}`;
 
+  if (screen === "landing") {
+    return <LandingPage onPlay={() => setScreen("game")} />;
+  }
+
   return (
     <div className="cw-root">
       <div className="cw-stars">
@@ -292,6 +329,10 @@ export default function App() {
             <button className={`cw-mute-btn ${muted ? "muted" : ""}`} onClick={toggleMute} title={muted ? "Unmute" : "Mute"}>
               {muted ? "🔇" : "🔊"}
             </button>
+            <button className="cw-tutorial-btn" onClick={() => setShowTutorial(true)} title="How to Play">
+              ? HOW TO PLAY
+            </button>
+            <button className="cw-home-btn" onClick={() => setScreen("landing")} title="Home">⌂</button>
           </div>
 
           <div className="cw-status-bar">
@@ -323,6 +364,7 @@ export default function App() {
           </div>
 
           <div className="cw-right-panel">
+            <PointsHUD stats={stats} lastAward={lastAward} />
             <ChroniclePanel narrating={narrating || aiThinking} displayed={aiThinking ? aiTaunt : displayed} />
             <SagaScroll storyLog={storyLog} />
             <PieceLegend />
@@ -400,6 +442,7 @@ export default function App() {
           </div>
         </div>
       )}
+      {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
     </div>
   );
 }
