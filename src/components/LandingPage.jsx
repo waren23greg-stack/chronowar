@@ -277,7 +277,7 @@ export default function LandingPage({ onPlay }) {
         </button>
 
         <div style={{
-          fontFamily: "'Cinzel', serif", fontSize: ".44rem",
+          fontFamily: "'Cinzel', serif", fontSize: "11px",
           letterSpacing: "4px", color: "rgba(130,100,45,.45)",
           opacity: phase >= 2 ? 1 : 0, transition: "opacity 1s .6s ease",
         }}>
@@ -292,7 +292,7 @@ export default function LandingPage({ onPlay }) {
           transition: "opacity 1.2s 1s ease",
           animation: "landFloat 2.8s ease-in-out infinite",
         }}>
-          <div style={{ fontFamily:"'Cinzel',serif", fontSize:".38rem", letterSpacing:"4px", color:"rgba(180,130,40,.6)" }}>DISCOVER</div>
+          <div style={{ fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"4px", color:"rgba(180,130,40,.6)" }}>DISCOVER</div>
           <svg width="14" height="20" viewBox="0 0 14 20">
             <path d="M7 1 L7 15 M3 11 L7 15 L11 11" stroke="rgba(200,148,40,.5)" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
           </svg>

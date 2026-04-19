@@ -81,8 +81,8 @@ export default function RealmBoard({ realm, cfg, board, sel, moves, lastMove, on
       {/* Realm header */}
       <div style={{
         fontFamily: "'Cinzel', serif",
-        fontSize: isPresent ? ".72rem" : ".52rem",
-        letterSpacing: isPresent ? 5 : 3,
+        fontSize: isPresent ? "14px" : "11px",
+        letterSpacing: isPresent ? 4 : 2,
         color: cfg.text,
         textAlign: "center",
         marginBottom: isPresent ? 8 : 5,
@@ -90,7 +90,7 @@ export default function RealmBoard({ realm, cfg, board, sel, moves, lastMove, on
         lineHeight: 1.3,
         textShadow: "0 1px 2px rgba(0,0,0,.4)",
       }}>
-        <span style={{ opacity: 0.75, marginRight: 6, fontSize: isPresent ? ".85rem" : ".65rem" }}>{cfg.icon}</span>
+        <span style={{ opacity: 0.75, marginRight: 6, fontSize: isPresent ? "16px" : "13px" }}>{cfg.icon}</span>
         {cfg.name}
       </div>
 
@@ -150,7 +150,7 @@ export default function RealmBoard({ realm, cfg, board, sel, moves, lastMove, on
         {COLS.map(l => (
           <div key={l} style={{
             width: sqSize, textAlign: "center",
-            fontSize: ".38rem",
+            fontSize: "10px",
             color: cfg.inkColor,
             fontFamily: "'Cinzel', serif",
             letterSpacing: 1,

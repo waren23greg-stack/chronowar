@@ -136,7 +136,7 @@ export default function MobileLayout({
             backgroundClip: "text",
           }}>CHRONOWAR</div>
           <div style={{
-            fontFamily: "'Cinzel', serif", fontSize: ".36rem",
+            fontFamily: "'Cinzel', serif", fontSize: "10px",
             letterSpacing: "3px", color: "rgba(100,70,20,.5)",
           }}>THREE REALMS</div>
         </div>
@@ -144,7 +144,7 @@ export default function MobileLayout({
         {/* Status pill */}
         <div style={{
           fontFamily: "'Cinzel', serif",
-          fontSize: ".5rem", letterSpacing: "2px",
+          fontSize: "13px", letterSpacing: "2px",
           color: statusColor,
           padding: "4px 12px",
           background: "rgba(255,255,255,.12)",
@@ -194,28 +194,28 @@ export default function MobileLayout({
           animation: "overlayIn .2s ease",
         }}>
           {/* Mode */}
-          <div style={{ padding:"6px 10px", fontFamily:"'Cinzel',serif", fontSize:".44rem", letterSpacing:"3px", color:"rgba(80,50,15,.5)" }}>MODE</div>
+          <div style={{ padding:"6px 10px", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"3px", color:"rgba(80,50,15,.5)" }}>MODE</div>
           <div style={{ display:"flex", gap:4, padding:"0 6px 6px" }}>
             {[["vs-ai","vs AI"],["vs-player","2 Player"]].map(([m,l]) => (
               <button key={m} onClick={() => { setMode(m); reset(); setShowMenu(false); }} style={{
                 flex:1, padding:"7px 4px",
                 background: mode===m ? "rgba(80,50,8,.85)" : "rgba(255,255,255,.3)",
                 border: "1px solid rgba(120,85,25,.35)",
-                borderRadius:6, fontFamily:"'Cinzel',serif", fontSize:".48rem",
+                borderRadius:6, fontFamily:"'Cinzel',serif", fontSize:"12px",
                 color: mode===m ? "#e0b840" : "#5a3810", cursor:"pointer",
               }}>{l}</button>
             ))}
           </div>
           {/* Difficulty */}
           {mode === "vs-ai" && <>
-            <div style={{ padding:"4px 10px", fontFamily:"'Cinzel',serif", fontSize:".44rem", letterSpacing:"3px", color:"rgba(80,50,15,.5)" }}>DIFFICULTY</div>
+            <div style={{ padding:"4px 10px", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"3px", color:"rgba(80,50,15,.5)" }}>DIFFICULTY</div>
             <div style={{ display:"flex", gap:4, padding:"0 6px 6px" }}>
               {[["easy","EASY"],["medium","MED"],["hard","HARD"]].map(([d,l]) => (
                 <button key={d} onClick={() => { setDifficulty(d); reset(); setShowMenu(false); }} style={{
                   flex:1, padding:"7px 4px",
                   background: difficulty===d ? "rgba(80,50,8,.85)" : "rgba(255,255,255,.3)",
                   border: "1px solid rgba(120,85,25,.35)",
-                  borderRadius:6, fontFamily:"'Cinzel',serif", fontSize:".48rem",
+                  borderRadius:6, fontFamily:"'Cinzel',serif", fontSize:"12px",
                   color: difficulty===d ? "#e0b840" : "#5a3810", cursor:"pointer",
                 }}>{l}</button>
               ))}
@@ -231,7 +231,7 @@ export default function MobileLayout({
             <button key={label} onClick={fn} style={{
               background:"rgba(255,255,255,.2)", border:"1px solid rgba(120,85,25,.25)",
               borderRadius:6, padding:"9px 14px", fontFamily:"'Cinzel',serif",
-              fontSize:".5rem", letterSpacing:"2px", color:"#3a1a04",
+              fontSize:"13px", letterSpacing:"2px", color:"#3a1a04",
               cursor:"pointer", textAlign:"left",
             }}>{label}</button>
           ))}
@@ -258,7 +258,7 @@ export default function MobileLayout({
               border: `1.5px solid ${active ? rcfg.border : "rgba(100,70,20,.15)"}`,
               borderRadius: 8,
               fontFamily: "'Cinzel', serif",
-              fontSize: active ? ".52rem" : ".44rem",
+              fontSize: active ? "13px" : "11px",
               letterSpacing: "2px",
               color: active ? rcfg.text : "rgba(90,65,20,.45)",
               cursor: "pointer",
@@ -284,7 +284,7 @@ export default function MobileLayout({
       }}>
         <div style={{
           display: "flex", alignItems: "center", gap: 6,
-          fontFamily: "'Cinzel', serif", fontSize: ".44rem", letterSpacing: "2px",
+          fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "2px",
         }}>
           <div style={{
             width: 8, height: 8, borderRadius: "50%",
@@ -300,7 +300,7 @@ export default function MobileLayout({
         <div style={{ width:20, height:1, background:"rgba(100,70,20,.2)" }}/>
         <div style={{
           display: "flex", alignItems: "center", gap: 6,
-          fontFamily: "'Cinzel', serif", fontSize: ".44rem", letterSpacing: "2px",
+          fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "2px",
         }}>
           <span style={{ color: !wTurn && !aiThinking ? "rgba(60,30,100,.9)" : "rgba(70,50,15,.35)" }}>
             UMBRAL
@@ -418,7 +418,7 @@ export default function MobileLayout({
             >
               <div style={{
                 fontFamily: "'Cinzel', serif",
-                fontSize: ".42rem", letterSpacing: "3px",
+                fontSize: "11px", letterSpacing: "3px",
                 color: "rgba(80,50,15,.55)",
                 flexShrink: 0,
               }}>CHRONICLE</div>
@@ -450,20 +450,20 @@ export default function MobileLayout({
               display:"flex", justifyContent:"space-between", alignItems:"center",
               marginBottom: 12, flexShrink: 0,
             }}>
-              <div style={{ fontFamily:"'Cinzel',serif", fontSize:".52rem", letterSpacing:"4px", color:"rgba(80,50,15,.65)" }}>
+              <div style={{ fontFamily:"'Cinzel',serif", fontSize:"13px", letterSpacing:"4px", color:"rgba(80,50,15,.65)" }}>
                 THE CHRONICLE
               </div>
               <div style={{ display:"flex", gap:8 }}>
                 <button onClick={openChronicle} style={{
                   background:"rgba(80,50,8,.85)", border:"1px solid rgba(180,130,35,.5)",
                   borderRadius:6, padding:"6px 14px",
-                  fontFamily:"'Cinzel',serif", fontSize:".44rem", letterSpacing:"2px",
+                  fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"2px",
                   color:"#e0b840", cursor:"pointer",
                 }}>FULL SAGA</button>
                 <button onClick={reset} style={{
                   background:"rgba(255,255,255,.2)", border:"1px solid rgba(100,70,20,.3)",
                   borderRadius:6, padding:"6px 12px",
-                  fontFamily:"'Cinzel',serif", fontSize:".44rem", letterSpacing:"2px",
+                  fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"2px",
                   color:"rgba(80,50,15,.75)", cursor:"pointer",
                 }}>NEW</button>
                 <button onClick={collapseSheet} style={{
@@ -513,7 +513,7 @@ export default function MobileLayout({
                     borderRadius:6, padding:"8px 6px", textAlign:"center",
                   }}>
                     <div style={{ fontFamily:"'Cinzel',serif", fontSize:".7rem", color:"rgba(50,28,8,.8)", fontWeight:600 }}>{v}</div>
-                    <div style={{ fontFamily:"'Cinzel',serif", fontSize:".38rem", letterSpacing:"2px", color:"rgba(100,70,25,.5)", marginTop:2 }}>{l}</div>
+                    <div style={{ fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", color:"rgba(100,70,25,.5)", marginTop:2 }}>{l}</div>
                   </div>
                 ))}
               </div>
@@ -521,7 +521,7 @@ export default function MobileLayout({
               {/* Saga scroll */}
               {storyLog.length > 0 && (
                 <div style={{ flexShrink:0 }}>
-                  <div style={{ fontFamily:"'Cinzel',serif", fontSize:".44rem", letterSpacing:"3px", color:"rgba(80,50,15,.5)", marginBottom:8 }}>
+                  <div style={{ fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"3px", color:"rgba(80,50,15,.5)", marginBottom:8 }}>
                     SAGA SCROLL
                   </div>
                   {storyLog.slice(0, 6).map((e, i) => (

@@ -174,10 +174,10 @@ export function PointsHUD({ stats, lastAward = null }) {
           <span style={{ fontSize: "1.1rem" }}>{rank.icon}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span style={{ fontFamily: "'Cinzel', serif", fontSize: ".52rem", letterSpacing: "2px", color: rank.color }}>
+              <span style={{ fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "1.5px", color: rank.color }}>
                 {rank.name.toUpperCase()}
               </span>
-              <span style={{ fontFamily: "'Cinzel', serif", fontSize: ".58rem", color: "#d4a843", letterSpacing: "1px" }}>
+              <span style={{ fontFamily: "'Cinzel', serif", fontSize: "13px", color: "#c48020", letterSpacing: "1px" }}>
                 {stats.cp.toLocaleString()} CP
               </span>
             </div>
@@ -194,7 +194,7 @@ export function PointsHUD({ stats, lastAward = null }) {
           </div>
         </div>
         {next && (
-          <div style={{ fontSize: ".42rem", color: "rgba(130,100,40,.55)", fontFamily: "'Cinzel', serif", marginTop: 4, letterSpacing: "1px" }}>
+          <div style={{ fontSize: "10px", color: "rgba(100,65,18,.65)", fontFamily: "'Cinzel', serif", marginTop: 4, letterSpacing: "1px" }}>
             {next.min - stats.cp} CP to {next.name}
           </div>
         )}
@@ -204,7 +204,7 @@ export function PointsHUD({ stats, lastAward = null }) {
       {lastAward && lastAward > 0 && (
         <div style={{
           position: "absolute", top: -22, right: 8,
-          fontFamily: "'Cinzel', serif", fontSize: ".65rem",
+          fontFamily: "'Cinzel', serif", fontSize: "13px",
           color: "#ffd060", letterSpacing: "1px",
           animation: "awardPop .6s ease forwards",
           pointerEvents: "none",
@@ -225,7 +225,7 @@ export function PointsHUD({ stats, lastAward = null }) {
           boxShadow: "0 8px 32px rgba(0,0,0,.7)",
           animation: "overlayIn .2s ease",
         }}>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: ".5rem", letterSpacing: "4px", color: "rgba(180,140,40,.6)", marginBottom: 10 }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: "11px", letterSpacing: "3px", color: "rgba(130,85,20,.7)", marginBottom: 10 }}>
             CHRONICLE STATS
           </div>
           {[
@@ -244,7 +244,7 @@ export function PointsHUD({ stats, lastAward = null }) {
               borderBottom: i < 7 ? "1px solid rgba(100,70,20,.12)" : "none",
               fontSize: ".8rem",
             }}>
-              <span style={{ color: "rgba(160,130,80,.7)", fontFamily: "'Cinzel', serif", fontSize: ".52rem", letterSpacing: "1px" }}>{label}</span>
+              <span style={{ color: "rgba(160,130,80,.7)", fontFamily: "'Cinzel', serif", fontSize: "12px", letterSpacing: "1px" }}>{label}</span>
               <span style={{ color: "rgba(215,185,120,.9)" }}>{val}</span>
             </div>
           ))}
