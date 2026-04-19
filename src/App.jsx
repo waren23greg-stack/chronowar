@@ -45,6 +45,7 @@ export default function App() {
   const [captured, setCaptured]   = useState({ white: [], black: [] });
   const [moveNum, setMoveNum]     = useState(0);
   const [lastMove, setLastMove]   = useState(null);
+  const [activeRealm, setActiveRealm] = useState("present");
 
   // ── Mode & difficulty ──
   const [mode, setMode]           = useState("vs-ai");   // "vs-ai" | "vs-player"
@@ -238,6 +239,7 @@ export default function App() {
   // ── Human click ──
   const handleClick = (realm, row, col) => {
     ensureAudio();
+    setActiveRealm(realm);
     if (!audioReady && moveNum === 0) { bootAudio(); setAudioReady(true); sfxGameStart(); }
     if (status === "checkmate" || status === "stalemate") return;
     if (mode === "vs-ai" && turn === "black") return;
@@ -297,7 +299,7 @@ export default function App() {
   }
 
   return (
-    <div className="cw-root">
+    <div className="cw-root" data-realm={activeRealm}>
       <div className="cw-stars">
         {STARS.map((s, i) => (
           <div key={i} className="cw-star" style={{ left:`${s.x}%`, top:`${s.y}%`, width:s.sz, height:s.sz, animationDuration:`${s.dur}s`, animationDelay:`${s.del}s` }} />
