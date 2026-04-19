@@ -4,7 +4,7 @@
 //  Piece-square tables tuned for 3-realm strategy
 // ============================================================
 
-import { REALMS, BS, isW, isB, pt, legalMoves, applyMove, inCheck, hasAnyLegal } from "./engine";
+import { REALMS, BS, isW, isB, pt, legalMoves, applyMove, inCheck, hasAnyLegal, serializePosition } from "./engine";
 
 // Material value per piece type
 const PIECE_VALUE = {
@@ -141,15 +141,25 @@ function orderMoves(boards, moves) {
   });
 }
 
-function minimax(boards, depth, alpha, beta, maximizing) {
-  if (depth === 0) return { score: evaluateBoard(boards) };
+function minimax(boards, depth, alpha, beta, maximizing, visitCounts = null) {
+  if (depth === 0) {
+    const score = evaluateBoard(boards);
+    // Penalise positions seen before — discourages cycling
+    if (visitCounts) {
+      const key = serializePosition(boards, maximizing ? "white" : "black");
+      const seen = visitCounts.get(key) || 0;
+      if (seen >= 2) return { score: score + (maximizing ? -800 : 800) };
+      if (seen === 1) return { score: score + (maximizing ? -150 : 150) };
+    }
+    return { score };
+  }
 
   const white = maximizing;
   const moves = getAllMoves(boards, white);
 
   if (moves.length === 0) {
     if (inCheck(boards, white)) return { score: maximizing ? -50000 + depth : 50000 - depth };
-    return { score: 0 }; // stalemate
+    return { score: 0 };
   }
 
   const ordered = orderMoves(boards, moves);
@@ -159,7 +169,11 @@ function minimax(boards, depth, alpha, beta, maximizing) {
     let maxScore = -Infinity;
     for (const m of ordered) {
       const nb = applyMove(boards, m.fromRealm, m.fromRow, m.fromCol, m.realm, m.row, m.col);
-      const { score } = minimax(nb, depth - 1, alpha, beta, false);
+      // Track child position
+      const childKey = serializePosition(nb, "black");
+      const childCounts = visitCounts ? new Map(visitCounts) : new Map();
+      childCounts.set(childKey, (childCounts.get(childKey) || 0) + 1);
+      const { score } = minimax(nb, depth - 1, alpha, beta, false, childCounts);
       if (score > maxScore) { maxScore = score; best = m; }
       alpha = Math.max(alpha, score);
       if (beta <= alpha) break;
@@ -169,7 +183,10 @@ function minimax(boards, depth, alpha, beta, maximizing) {
     let minScore = Infinity;
     for (const m of ordered) {
       const nb = applyMove(boards, m.fromRealm, m.fromRow, m.fromCol, m.realm, m.row, m.col);
-      const { score } = minimax(nb, depth - 1, alpha, beta, true);
+      const childKey = serializePosition(nb, "white");
+      const childCounts = visitCounts ? new Map(visitCounts) : new Map();
+      childCounts.set(childKey, (childCounts.get(childKey) || 0) + 1);
+      const { score } = minimax(nb, depth - 1, alpha, beta, true, childCounts);
       if (score < minScore) { minScore = score; best = m; }
       beta = Math.min(beta, score);
       if (beta <= alpha) break;

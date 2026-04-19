@@ -129,6 +129,13 @@ export const isB = (p) => p && p[0] === "B";
 export const sameCol = (a, b) => (isW(a) && isW(b)) || (isB(a) && isB(b));
 export const pt = (p) => p && p.split("_")[1];
 
+// Canonical position key for repetition detection (AI search tree)
+export function serializePosition(boards, sideToMove) {
+  return REALMS.map(r =>
+    boards[r].map(row => row.map(p => p || ".").join("")).join("/")
+  ).join("|") + ":" + sideToMove[0];
+}
+
 export function makeBoard(fill = false) {
   const b = Array(BS).fill(null).map(() => Array(BS).fill(null));
   if (fill) {

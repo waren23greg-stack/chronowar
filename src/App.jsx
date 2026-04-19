@@ -168,9 +168,21 @@ export default function App() {
   // ── Narration ──
   const doNarration = useCallback(async (info) => {
     setNarrating(true);
-    const ctx = storyCtx.current.slice(-3).join(" ");
+    // Strip any "undefined" that crept into context from previous bugs
+    const ctx = storyCtx.current
+      .filter(s => typeof s === "string" && !s.includes("undefined") && s.length > 10)
+      .slice(-3)
+      .join(" ");
     const text = await generateNarration(info, ctx);
-    const final = text || `${LORE[info.piece]}, ${info.side === "white" ? "champion of the Luminar Order" : "harbinger of the Umbral Conclave"}, advances through the ${info.trRealm} realm.`;
+    // Sanitize API response — strip "undefined" if echoed back
+    const cleanText = (text || "")
+      .replace(/undefined/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    const fallback = `${LORE[info.piece] || "A warrior"}, ${
+      info.side === "white" ? "champion of the Luminar Order" : "harbinger of the Umbral Conclave"
+    }, moves through the ${info.trRealm || info.frRealm || "present"} realm.`;
+    const final = (cleanText && cleanText.length > 20) ? cleanText : fallback;
     storyCtx.current = [...storyCtx.current.slice(-4), final];
     const entry = { t: final, p: info.piece, n: info.num, side: info.side };
     setStoryLog(prev => [entry, ...prev.slice(0, 19)]);
