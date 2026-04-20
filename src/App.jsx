@@ -34,6 +34,7 @@ import {
   loadStats, awardGameEnd, awardMoveEvent,
 } from "./points.jsx";
 import "./App.css";
+import ChronowarLogo from "./components/ChronowarLogo";
 
 const STARS = Array.from({ length: 65 }, (_, i) => ({
   x: (i * 41.37 + 7.11) % 100, y: (i * 67.91 + 3.55) % 100,
@@ -578,8 +579,13 @@ export default function App() {
       <div className="cw-content">
         {/* ── Header ── */}
         <header className="cw-header">
-          <h1 className="cw-title">CHRONOWAR</h1>
-          <div className="cw-subtitle">THE CHRONICLES OF THREE REALMS</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:14 }}>
+            <ChronowarLogo size={48} showText={false} animate={false} />
+            <div>
+              <h1 className="cw-title">CHRONOWAR</h1>
+              <div className="cw-subtitle">THE CHRONICLES OF THREE REALMS</div>
+            </div>
+          </div>
 
           {/* Mode + difficulty controls */}
           <div className="cw-controls">

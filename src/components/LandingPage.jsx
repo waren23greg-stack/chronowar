@@ -3,6 +3,7 @@
 //  Cinematic. No emoji. Designed to make you want to play.
 // ============================================================
 import { useEffect, useState, useRef } from "react";
+import ChronowarLogo from "./ChronowarLogo";
 import { King, Queen, Knight, Sage, PhaseWalker } from "../pieces";
 
 // ── Tiny SVG icons (no emoji) ─────────────────────────────
@@ -173,62 +174,29 @@ export default function LandingPage({ onPlay, onTour }) {
           background: "linear-gradient(90deg,transparent,rgba(180,130,40,.3),transparent)",
         }} />
 
-        {/* Eyebrow */}
+        {/* ── LOGO EMBLEM ── */}
         <div style={{
-          fontFamily: "'Cinzel', serif",
-          fontSize: ".5rem", letterSpacing: "8px",
-          color: "rgba(180,130,40,.5)",
-          marginBottom: 28,
           opacity: phase >= 1 ? 1 : 0,
-          transform: phase >= 1 ? "none" : "translateY(8px)",
-          transition: "opacity .8s ease, transform .8s ease",
+          transform: phase >= 1 ? "scale(1)" : "scale(0.88)",
+          transition: "opacity 1s ease, transform 1.1s cubic-bezier(.34,1.56,.64,1)",
+          marginBottom: 8,
+          filter: "drop-shadow(0 0 32px rgba(200,144,48,.22)) drop-shadow(0 4px 16px rgba(0,0,0,.7))",
         }}>
-          THE CHRONICLES OF THREE REALMS
+          <ChronowarLogo size={220} showText={true} animate={true} />
         </div>
-
-        {/* Title */}
-        <h1 style={{
-          fontFamily: "'Cinzel Decorative', serif",
-          fontSize: "clamp(2.2rem, 8vw, 6.5rem)",
-          letterSpacing: "clamp(2px, 1.5vw, 18px)",
-          margin: "0 0 4px",
-          lineHeight: 1.1,
-          background: "linear-gradient(165deg, #f0d878 0%, #c89030 30%, #e8c050 55%, #9a6818 80%, #c89030 100%)",
-          backgroundSize: "200% auto",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          backgroundClip: "text",
-          animation: "shimmer 6s linear infinite",
-          opacity: phase >= 1 ? 1 : 0,
-          transform: phase >= 1 ? "none" : "translateY(16px)",
-          transition: "opacity .9s .1s ease, transform .9s .1s ease",
-          wordBreak: "keep-all",
-          maxWidth: "100%",
-        }}>
-          CHRONOWAR
-        </h1>
-
-        {/* Subtitle rule */}
-        <div style={{
-          width: 120, height: 1,
-          background: "linear-gradient(90deg,transparent,rgba(200,144,48,.55),transparent)",
-          margin: "18px auto 24px",
-          opacity: phase >= 1 ? 1 : 0,
-          transition: "opacity 1s .3s ease",
-        }}/>
 
         {/* Body copy */}
         <p style={{
-          fontSize: "clamp(1rem, 3vw, 1.45rem)",
-          lineHeight: 1.85,
-          color: "rgba(228,208,172,.82)",
-          maxWidth: 560,
+          fontSize: "clamp(.95rem, 2.5vw, 1.35rem)",
+          lineHeight: 1.9,
+          color: "rgba(228,208,172,.78)",
+          maxWidth: 520,
           margin: "0 auto 40px",
           fontStyle: "italic",
           fontWeight: 400,
           opacity: phase >= 1 ? 1 : 0,
           transform: phase >= 1 ? "none" : "translateY(12px)",
-          transition: "opacity 1s .25s ease, transform 1s .25s ease",
+          transition: "opacity 1s .35s ease, transform 1s .35s ease",
           padding: "0 4px",
         }}>
           Two ancient orders wage war across Past, Present, and Future.
