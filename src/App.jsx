@@ -517,6 +517,7 @@ export default function App() {
           mode={mode} difficulty={difficulty}
           setMode={setMode} setDifficulty={setDifficulty}
           muted={muted} toggleMute={toggleMute}
+          ensureAudio={ensureAudio}
           setShowTutorial={setShowTutorial} setScreen={setScreen}
         />
         {showOver && (

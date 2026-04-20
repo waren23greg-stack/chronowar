@@ -159,11 +159,12 @@ export default function LandingPage({ onPlay, onTour }) {
          ══════════════════════════════════════════ */}
       <section ref={heroRef} style={{
         position: "relative", zIndex: 1,
-        minHeight: "100vh",
+        minHeight: "100svh",
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
-        padding: "60px 24px 80px",
+        padding: "60px 20px 70px",
         textAlign: "center",
+        overflow: "hidden",
       }}>
         {/* Top rule */}
         <div style={{
@@ -188,10 +189,10 @@ export default function LandingPage({ onPlay, onTour }) {
         {/* Title */}
         <h1 style={{
           fontFamily: "'Cinzel Decorative', serif",
-          fontSize: "clamp(3rem, 9vw, 6.5rem)",
-          letterSpacing: "clamp(6px, 2vw, 18px)",
+          fontSize: "clamp(2.2rem, 8vw, 6.5rem)",
+          letterSpacing: "clamp(2px, 1.5vw, 18px)",
           margin: "0 0 4px",
-          lineHeight: 1,
+          lineHeight: 1.1,
           background: "linear-gradient(165deg, #f0d878 0%, #c89030 30%, #e8c050 55%, #9a6818 80%, #c89030 100%)",
           backgroundSize: "200% auto",
           WebkitBackgroundClip: "text",
@@ -201,6 +202,8 @@ export default function LandingPage({ onPlay, onTour }) {
           opacity: phase >= 1 ? 1 : 0,
           transform: phase >= 1 ? "none" : "translateY(16px)",
           transition: "opacity .9s .1s ease, transform .9s .1s ease",
+          wordBreak: "keep-all",
+          maxWidth: "100%",
         }}>
           CHRONOWAR
         </h1>
@@ -216,16 +219,17 @@ export default function LandingPage({ onPlay, onTour }) {
 
         {/* Body copy */}
         <p style={{
-          fontSize: "clamp(1.1rem, 2.2vw, 1.45rem)",
+          fontSize: "clamp(1rem, 3vw, 1.45rem)",
           lineHeight: 1.85,
           color: "rgba(228,208,172,.82)",
-          maxWidth: 580,
-          margin: "0 auto 48px",
+          maxWidth: 560,
+          margin: "0 auto 40px",
           fontStyle: "italic",
           fontWeight: 400,
           opacity: phase >= 1 ? 1 : 0,
           transform: phase >= 1 ? "none" : "translateY(12px)",
           transition: "opacity 1s .25s ease, transform 1s .25s ease",
+          padding: "0 4px",
         }}>
           Two ancient orders wage war across Past, Present, and Future.
           Every move you make is written into myth by an eternal chronicler.
