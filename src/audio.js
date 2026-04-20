@@ -1,62 +1,95 @@
 // ============================================================
-//  CHRONOWAR — ORCHESTRAL AUDIO ENGINE v3
-//  Instrumentation: Violin · Viola · Cello · Flute · Harp
-//  Mood: Cinematic, calm, deeply atmospheric
-//  Key: D minor — warm, melancholic, ancient
+//  CHRONOWAR — ORCHESTRAL AUDIO ENGINE v4
+//  5 distinct cinematic compositions, smooth crossfade rotation
+//
+//  Track 1 — "Ashes of the Past"       D minor · Cello-led · Very slow
+//  Track 2 — "The Living Battlefield"  A minor · Violin/harp · Urgent
+//  Track 3 — "Voices From the Future"  E Dorian · Flute-led · Ethereal
+//  Track 4 — "The Eternal March"       G minor · Full strings · Stately
+//  Track 5 — "Chronicle's Twilight"    F major  · Violin+Flute · Warm
 // ============================================================
 
-let ctx = null;
-let masterGain = null;
-let musicGain  = null;
-let sfxGain    = null;
-let reverb     = null;
-let musicPhase = "calm";
-let chordIdx   = 0;
-let _muted     = false;
+// ── Context & routing nodes ───────────────────────────────
+let ctx         = null;
+let masterGain  = null;
+let musicGain   = null;
+let sfxGain     = null;
+let reverb      = null;
 
-const F = {
-  D2:73.42, A2:110, C3:130.81, D3:146.83, E3:164.81,
-  F3:174.61, G3:196, A3:220, Bb3:233.08, C4:261.63,
-  D4:293.66, E4:329.63, F4:349.23, G4:392, A4:440,
-  Bb4:466.16, C5:523.25, D5:587.33, E5:659.25, F5:698.46,
-  G5:784, A5:880, C6:1046.5,
-};
+// ── Music state ───────────────────────────────────────────
+let _muted      = false;
+let musicPhase  = "calm"; // "calm" | "tension" | "epic"
 
-// ─── Boot ────────────────────────────────────────────────
+// ── Track rotation ────────────────────────────────────────
+let trackIdx         = 0;
+let chordInTrack     = 0;
+let currentDest      = null;  // current sessionGain → musicGain
+let musicTimer       = null;
+
+// Publicly exported track name (for optional UI display)
+export let currentTrackName = "";
+
+// ─────────────────────────────────────────────────────────
+//  BOOT
+// ─────────────────────────────────────────────────────────
 export function bootAudio() {
   if (ctx) { if (ctx.state === "suspended") ctx.resume(); return ctx; }
-  ctx = new (window.AudioContext || window.webkitAudioContext)();
-  masterGain = ctx.createGain(); masterGain.gain.value = 0.78; masterGain.connect(ctx.destination);
-  musicGain  = ctx.createGain(); musicGain.gain.value  = 0.42; musicGain.connect(masterGain);
-  sfxGain    = ctx.createGain(); sfxGain.gain.value    = 0.72; sfxGain.connect(masterGain);
-  reverb = buildReverb(4.5, 0.55);
-  startScore();
+  ctx         = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain  = ctx.createGain(); masterGain.gain.value = 0.78; masterGain.connect(ctx.destination);
+  musicGain   = ctx.createGain(); musicGain.gain.value  = 0.44; musicGain.connect(masterGain);
+  sfxGain     = ctx.createGain(); sfxGain.gain.value    = 0.72; sfxGain.connect(masterGain);
+  reverb      = buildReverb(4.8, 0.52);
+  // First session gain
+  currentDest = makeSessionGain(1.0);
+  scheduleNextTrack(1200);
   return ctx;
 }
 
 export function setMasterVolume(v) {
   if (!masterGain) return;
-  _muted = v === 0;
+  _muted = (v === 0);
   masterGain.gain.linearRampToValueAtTime(v, ctx.currentTime + 0.5);
 }
 
-export function setMusicPhase(p) { musicPhase = p; }
+// ─────────────────────────────────────────────────────────
+//  SESSION GAIN — isolated gain node per track instance
+//  Voices route: osc → g → [dry → sessionGain → musicGain]
+//                           [wet → reverb    → masterGain]
+// ─────────────────────────────────────────────────────────
+function makeSessionGain(initialVol = 0) {
+  const g = ctx.createGain();
+  g.gain.value = initialVol;
+  g.connect(musicGain);
+  return g;
+}
 
-// ─── Reverb ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+//  REVERB — long hall impulse
+// ─────────────────────────────────────────────────────────
 function buildReverb(dur, decay) {
   const conv = ctx.createConvolver();
-  const sr = ctx.sampleRate, len = sr * dur;
+  const sr = ctx.sampleRate, len = Math.ceil(sr * dur);
   const buf = ctx.createBuffer(2, len, sr);
   for (let c = 0; c < 2; c++) {
     const ch = buf.getChannelData(c);
-    for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    for (let i = 0; i < len; i++)
+      ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
   }
   conv.buffer = buf; conv.connect(masterGain); return conv;
 }
 
-// ─── Violin/Viola — bowed string ─────────────────────────
-function violin(freq, duration = 2.5, vol = 0.07, vibDepth = 4, vibRate = 5.5, attack = 0.38, detune = 0) {
-  if (!ctx) return;
+// ─────────────────────────────────────────────────────────
+//  VOICE BUILDERS — each writes to currentDest
+// ─────────────────────────────────────────────────────────
+
+// Vol multiplier so phase-volume is applied at voice level
+function phaseVol(v) {
+  return v * (musicPhase === "epic" ? 1.25 : musicPhase === "tension" ? 1.10 : 1.0);
+}
+
+function violin(freq, dur = 2.5, vol = 0.07, vibDepth = 4, vibRate = 5.5, attack = 0.38, detune = 0, dest = null) {
+  if (!ctx || !currentDest) return;
+  dest = dest || currentDest;
   const t = ctx.currentTime;
   const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
   lfo.frequency.value = vibRate; lfoG.gain.value = vibDepth; lfo.connect(lfoG);
@@ -70,27 +103,25 @@ function violin(freq, duration = 2.5, vol = 0.07, vibDepth = 4, vibRate = 5.5, a
   osc.connect(hp); hp.connect(pk); pk.connect(lp); lp.connect(g);
   const dry = ctx.createGain(); dry.gain.value = 0.55;
   const wet = ctx.createGain(); wet.gain.value = 0.45;
-  g.connect(dry); dry.connect(musicGain); g.connect(wet); wet.connect(reverb);
+  const v = phaseVol(vol);
+  g.connect(dry); dry.connect(dest); g.connect(wet); wet.connect(reverb);
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(vol, t + attack);
-  g.gain.setValueAtTime(vol * 0.88, t + duration - 0.7);
-  g.gain.linearRampToValueAtTime(0, t + duration);
-  lfo.start(t); lfo.stop(t + duration);
-  osc.start(t); osc.stop(t + duration);
+  g.gain.linearRampToValueAtTime(v, t + attack);
+  g.gain.setValueAtTime(v * 0.88, t + dur - 0.7);
+  g.gain.linearRampToValueAtTime(0, t + dur);
+  lfo.start(t); lfo.stop(t + dur); osc.start(t); osc.stop(t + dur);
 }
 
-// ─── Cello ───────────────────────────────────────────────
-function cello(freq, duration = 3.5, vol = 0.07, attack = 0.5) {
-  violin(freq, duration, vol, 2.2, 4.0, attack, 0);
+function cello(freq, dur = 3.5, vol = 0.07, attack = 0.55, dest = null) {
+  violin(freq, dur, vol, 2.2, 4.0, attack, 0, dest);
 }
 
-// ─── Flute — pure sine + breath + vibrato ────────────────
-function flute(freq, duration = 2.0, vol = 0.052, delay = 0) {
-  if (!ctx) return;
+function flute(freq, dur = 2.0, vol = 0.052, delay = 0, dest = null) {
+  if (!ctx || !currentDest) return;
+  dest = dest || currentDest;
   const t = ctx.currentTime + delay;
   const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
-  lfo.frequency.value = 5.9; lfoG.gain.value = 3.2;
-  lfo.connect(lfoG);
+  lfo.frequency.value = 5.9; lfoG.gain.value = 3.2; lfo.connect(lfoG);
   const osc = ctx.createOscillator(); osc.type = "sine"; osc.frequency.value = freq;
   lfoG.connect(osc.frequency);
   const osc2 = ctx.createOscillator(); osc2.type = "sine"; osc2.frequency.value = freq * 2;
@@ -98,11 +129,10 @@ function flute(freq, duration = 2.0, vol = 0.052, delay = 0) {
   const g2 = ctx.createGain(); g2.gain.value = 0.12;
   osc.connect(g1); osc2.connect(g2);
   const mix = ctx.createGain(); g1.connect(mix); g2.connect(mix);
-  // Breath
-  const nLen = Math.ceil(ctx.sampleRate * duration);
+  const nLen = Math.ceil(ctx.sampleRate * Math.max(0.05, dur));
   const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
   const nd = nBuf.getChannelData(0);
-  for (let i = 0; i < nLen; i++) nd[i] = (Math.random() * 2 - 1) * 0.015;
+  for (let i = 0; i < nLen; i++) nd[i] = (Math.random() * 2 - 1) * 0.014;
   const nSrc = ctx.createBufferSource(); nSrc.buffer = nBuf;
   const nbp = ctx.createBiquadFilter(); nbp.type = "bandpass"; nbp.frequency.value = freq; nbp.Q.value = 9;
   nSrc.connect(nbp); nbp.connect(mix);
@@ -110,20 +140,19 @@ function flute(freq, duration = 2.0, vol = 0.052, delay = 0) {
   mix.connect(gMain);
   const dry = ctx.createGain(); dry.gain.value = 0.5;
   const wet = ctx.createGain(); wet.gain.value = 0.5;
-  gMain.connect(dry); dry.connect(musicGain); gMain.connect(wet); wet.connect(reverb);
+  const v = phaseVol(vol);
+  gMain.connect(dry); dry.connect(dest); gMain.connect(wet); wet.connect(reverb);
   gMain.gain.setValueAtTime(0, t);
-  gMain.gain.linearRampToValueAtTime(vol, t + 0.18);
-  gMain.gain.setValueAtTime(vol, t + duration - 0.35);
-  gMain.gain.linearRampToValueAtTime(0, t + duration);
-  lfo.start(t); lfo.stop(t + duration);
-  osc.start(t); osc.stop(t + duration);
-  osc2.start(t); osc2.stop(t + duration);
-  nSrc.start(t); nSrc.stop(t + duration);
+  gMain.gain.linearRampToValueAtTime(v, t + 0.18);
+  gMain.gain.setValueAtTime(v, t + dur - 0.35);
+  gMain.gain.linearRampToValueAtTime(0, t + dur);
+  lfo.start(t); lfo.stop(t + dur); osc.start(t); osc.stop(t + dur);
+  osc2.start(t); osc2.stop(t + dur); nSrc.start(t); nSrc.stop(t + dur);
 }
 
-// ─── Harp — triangle pluck ───────────────────────────────
-function harp(freq, duration = 1.6, vol = 0.055, delay = 0) {
+function harp(freq, dur = 1.6, vol = 0.055, delay = 0, dest = null) {
   if (!ctx) return;
+  dest = dest || currentDest || sfxGain;
   const t = ctx.currentTime + delay;
   const osc = ctx.createOscillator(); osc.type = "triangle"; osc.frequency.value = freq;
   const osc2 = ctx.createOscillator(); osc2.type = "sine"; osc2.frequency.value = freq * 2;
@@ -132,141 +161,392 @@ function harp(freq, duration = 1.6, vol = 0.055, delay = 0) {
   osc.connect(g1); osc2.connect(g2);
   const gMain = ctx.createGain();
   g1.connect(gMain); g2.connect(gMain);
-  const wet = ctx.createGain(); wet.gain.value = 0.55;
-  gMain.connect(sfxGain); gMain.connect(wet); wet.connect(reverb);
-  gMain.gain.setValueAtTime(vol, t);
-  gMain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-  osc.start(t); osc.stop(t + duration);
-  osc2.start(t); osc2.stop(t + duration);
+  const wet = ctx.createGain(); wet.gain.value = 0.5;
+  gMain.connect(dest); gMain.connect(wet); wet.connect(reverb);
+  gMain.gain.setValueAtTime(phaseVol(vol), t);
+  gMain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.start(t); osc.stop(t + dur); osc2.start(t); osc2.stop(t + dur);
 }
 
-// ─── Score chords ─────────────────────────────────────────
-const CHORDS = {
-  Dm: [F.D3,F.F3,F.A3,F.D4,F.F4,F.A4],
-  Gm: [F.G3,F.Bb3,F.D4,F.G4,F.Bb4],
-  Bb: [F.F3,F.Bb3,F.D4,F.F4],
-  F:  [F.F3,F.A3,F.C4,F.F4,F.A4],
-  Am: [F.A3,F.C4,F.E4,F.A4],
-  C:  [F.C3,F.E3,F.G3,F.C4],
-};
-const FLUTE_LINES = {
-  Dm:[F.F5,F.E5,F.D5,F.A5], Gm:[F.G5,F.F5,F.D5,F.Bb4],
-  Bb:[F.D5,F.F5,F.Bb4,F.D5], F:[F.C5,F.A4,F.F5,F.C5],
-  Am:[F.E5,F.C5,F.A4,F.E5], C:[F.E5,F.G5,F.C5,F.E5],
-};
-const PROGS = {
-  calm:    ["Dm","F","Gm","Bb"],
-  tension: ["Dm","Am","Gm","C"],
-  epic:    ["Dm","Gm","Bb","Dm"],
+// ─────────────────────────────────────────────────────────
+//  THE FIVE COMPOSITIONS
+// ─────────────────────────────────────────────────────────
+
+// ── Hz reference ──
+const Hz = {
+  // Octave 2
+  Bb1:58.27, D2:73.42,  Eb2:77.78, F2:87.31,  G2:98.00,
+  Ab2:103.83,A2:110,    Bb2:116.54,B2:123.47,  C3:130.81,
+  Cs3:138.59,D3:146.83, Eb3:155.56,E3:164.81,  F3:174.61,
+  Fs3:185.00,G3:196,    Ab3:207.65,A3:220,      Bb3:233.08,
+  B3:246.94, C4:261.63, Cs4:277.18,D4:293.66,  Eb4:311.13,
+  E4:329.63, F4:349.23, Fs4:369.99,G4:392,     Ab4:415.30,
+  A4:440,    Bb4:466.16,B4:493.88, C5:523.25,  D5:587.33,
+  Eb5:622.25,E5:659.25, F5:698.46, Fs5:739.99, G5:784,
+  A5:880,    Bb5:932.33,C6:1046.5,
 };
 
-function playChord(name, dur) {
-  const notes = CHORDS[name] || CHORDS.Dm;
-  const isEpic = musicPhase === "epic";
-  const isTens = musicPhase === "tension";
-  // Cello foundation
-  cello(notes[0] * 0.5, dur, isEpic ? 0.09 : 0.065, 0.6);
-  cello(notes[1] * 0.5, dur, 0.05, 0.65);
-  // Viola middle
-  notes.slice(1, 4).forEach((n, i) =>
-    violin(n, dur, isEpic ? 0.062 : 0.045, 3.5+i*0.3, 5.2, 0.42+i*0.06, i*4));
-  // Violin upper
-  notes.slice(3).forEach((n, i) => {
-    violin(n, dur, isEpic ? 0.048 : 0.033, 4.5+i*0.4, 5.8, 0.52+i*0.05, -i*5);
-    violin(n, dur, isEpic ? 0.028 : 0.018, 4.0, 5.4, 0.58, 14+i*3);
-  });
-  // Flute
-  const line = FLUTE_LINES[name] || FLUTE_LINES.Dm;
-  if (isEpic) {
-    line.forEach((n, i) => flute(n, dur / line.length + 0.15, 0.05, (dur / line.length) * i));
-  } else if (Math.random() > 0.3) {
-    flute(line[Math.floor(Math.random() * line.length)], dur * 0.55, 0.042, 0.3 + Math.random() * 0.6);
+// ─────────────────────────────────────────────────────────
+// TRACK 1 — "Ashes of the Past"
+// D minor · Solo cello dominant · Very slow 9s · Ancient, lonely
+// ─────────────────────────────────────────────────────────
+const T1 = {
+  name: "Ashes of the Past",
+  chordDur: 9.0,
+  cyclesPerRotation: 5,  // 5 chords then rotate
+  prog: [
+    [Hz.D2, Hz.F3,  Hz.A3,  Hz.D4,  Hz.F4],
+    [Hz.A2, Hz.E3,  Hz.A3,  Hz.C4,  Hz.E4],
+    [Hz.C3, Hz.E3,  Hz.G3,  Hz.C4,  Hz.E4],
+    [Hz.G2, Hz.D3,  Hz.G3,  Hz.Bb3, Hz.D4],
+    [Hz.F2, Hz.C3,  Hz.F3,  Hz.A3,  Hz.C4],
+  ],
+  fluteNotes: [Hz.D5, Hz.A5, Hz.F5, Hz.D5, Hz.C5],
+  play(notes, dur, fi) {
+    // Solo cello — the star of this track
+    cello(notes[0] * 0.5, dur, 0.095, 0.65);
+    cello(notes[1] * 0.5, dur, 0.060, 0.75);
+    // Sparse viola
+    violin(notes[2], dur, 0.042, 3.0, 4.8, 0.55, 0);
+    violin(notes[3], dur, 0.030, 3.2, 4.8, 0.65, 6);
+    // Occasional flute — only every 2nd chord, single long note
+    if (fi % 2 === 0) {
+      flute(this.fluteNotes[fi % this.fluteNotes.length], dur * 0.7, 0.038, 1.0);
+    }
+  },
+};
+
+// ─────────────────────────────────────────────────────────
+// TRACK 2 — "The Living Battlefield"
+// A minor · Active violin + harp pulse · 4.5s · Urgent, forward-moving
+// ─────────────────────────────────────────────────────────
+const T2 = {
+  name: "The Living Battlefield",
+  chordDur: 4.5,
+  cyclesPerRotation: 8,
+  prog: [
+    [Hz.A2, Hz.C3,  Hz.E3,  Hz.A3,  Hz.C4,  Hz.E4],
+    [Hz.F2, Hz.C3,  Hz.F3,  Hz.A3,  Hz.C4],
+    [Hz.G2, Hz.D3,  Hz.G3,  Hz.B3,  Hz.D4],
+    [Hz.E3, Hz.B3,  Hz.E4,  Hz.G4],
+    [Hz.A2, Hz.E3,  Hz.A3,  Hz.C4,  Hz.E4],
+    [Hz.D3, Hz.F3,  Hz.A3,  Hz.D4],
+    [Hz.G2, Hz.B3,  Hz.D4,  Hz.G4],
+    [Hz.E3, Hz.G3,  Hz.B3,  Hz.E4],
+  ],
+  fluteNotes: [Hz.E5, Hz.C5, Hz.D5, Hz.B4||Hz.Bb4, Hz.A4, Hz.G4, Hz.A4, Hz.E5],
+  play(notes, dur, fi) {
+    // Cello foundation
+    cello(notes[0] * 0.5, dur, 0.065, 0.5);
+    // Active violin section — higher energy
+    notes.slice(1, 4).forEach((n, i) =>
+      violin(n, dur, 0.058, 4.5+i*0.4, 5.8, 0.30+i*0.04, i*5));
+    notes.slice(3).forEach((n, i) =>
+      violin(n, dur, 0.038, 5.0, 6.0, 0.38, -i*4));
+    // Harp arpeggio pulse — every 1.1s through the chord
+    const arpNotes = notes.slice(0, 4);
+    arpNotes.forEach((n, i) => harp(n, dur * 0.38, 0.042, i * 1.1));
+    // Short staccato flute phrase (2 notes quick)
+    if (Math.random() > 0.35) {
+      const fn = this.fluteNotes[fi % this.fluteNotes.length];
+      flute(fn, dur * 0.35, 0.048, 0.2);
+      flute(fn * 1.125, dur * 0.3, 0.038, dur * 0.38 + 0.1);
+    }
+  },
+};
+
+// ─────────────────────────────────────────────────────────
+// TRACK 3 — "Voices From the Future"
+// E Dorian · Flute dominant · 7s · Mysterious, ethereal, timeless
+// ─────────────────────────────────────────────────────────
+const T3 = {
+  name: "Voices From the Future",
+  chordDur: 7.0,
+  cyclesPerRotation: 4,
+  prog: [
+    [Hz.E3, Hz.G3,  Hz.B3,  Hz.E4,  Hz.G4],
+    [Hz.D3, Hz.Fs3, Hz.A3,  Hz.D4,  Hz.Fs4],
+    [Hz.B2, Hz.D3,  Hz.Fs3, Hz.B3,  Hz.D4],
+    [Hz.A2, Hz.Cs3, Hz.E3,  Hz.A3,  Hz.Cs4],
+  ],
+  fluteLines: [
+    [Hz.E5, Hz.Fs5, Hz.G5, Hz.E5],
+    [Hz.D5, Hz.Fs5, Hz.A5, Hz.D5],
+    [Hz.B4, Hz.D5,  Hz.Fs5, Hz.B4||Hz.Bb4],
+    [Hz.A4, Hz.Cs4, Hz.E5, Hz.A4],
+  ],
+  play(notes, dur, fi) {
+    // Strings are the background — soft, high register, barely there
+    cello(notes[0] * 0.5, dur, 0.045, 0.8);
+    notes.slice(1, 3).forEach((n, i) =>
+      violin(n, dur, 0.030, 3.5, 5.5, 0.6+i*0.1, i*8));
+    notes.slice(2).forEach((n, i) =>
+      violin(n, dur, 0.022, 4.0, 6.0, 0.7, -i*6));
+    // Flute IS the melody — full phrase across the chord duration
+    const line = this.fluteLines[fi % this.fluteLines.length];
+    const noteDur = (dur - 0.4) / line.length;
+    line.forEach((fn, i) => flute(fn, noteDur + 0.3, 0.058, i * noteDur));
+    // Harp — high register shimmer only
+    [notes[2], notes[3] || notes[2], notes[4] || notes[2]].forEach((n, i) =>
+      harp(n * 2, dur * 0.3, 0.028, 0.5 + i * 2.0));
+  },
+};
+
+// ─────────────────────────────────────────────────────────
+// TRACK 4 — "The Eternal March"
+// G minor · Full strings + harp pulse · 6s · Stately, ceremonial
+// ─────────────────────────────────────────────────────────
+const T4 = {
+  name: "The Eternal March",
+  chordDur: 6.0,
+  cyclesPerRotation: 6,
+  prog: [
+    [Hz.G2,  Hz.D3,  Hz.G3,  Hz.Bb3, Hz.D4,  Hz.G4],
+    [Hz.Eb2, Hz.Bb2, Hz.Eb3, Hz.G3,  Hz.Bb3, Hz.Eb4||Hz.E4],
+    [Hz.Bb1, Hz.F2,  Hz.Bb2, Hz.D3,  Hz.F3,  Hz.Bb3],
+    [Hz.F2,  Hz.C3,  Hz.F3,  Hz.A3,  Hz.C4,  Hz.F4],
+    [Hz.G2,  Hz.Bb2, Hz.D3,  Hz.G3,  Hz.Bb3],
+    [Hz.C3,  Hz.Eb3, Hz.G3,  Hz.C4,  Hz.Eb4||Hz.E4],
+  ],
+  fluteNotes: [Hz.G5, Hz.Bb5||Hz.A5, Hz.D5, Hz.F5, Hz.G5, Hz.Eb5||Hz.E5],
+  play(notes, dur, fi) {
+    // Heavy cello foundation
+    cello(notes[0] * 0.5, dur, 0.098, 0.5);
+    cello(notes[1] * 0.5, dur, 0.065, 0.58);
+    // Full viola section
+    notes.slice(1, 4).forEach((n, i) =>
+      violin(n, dur, 0.065, 3.2+i*0.3, 5.0, 0.40+i*0.06, i*4));
+    // Violin upper
+    notes.slice(3).forEach((n, i) =>
+      violin(n, dur, 0.048, 4.0, 5.5, 0.50, -i*5));
+    // Harp heartbeat pulse — every 1.5s, like a march
+    for (let t = 0; t < dur - 0.5; t += 1.5) {
+      harp(notes[0], 1.2, 0.040, t);
+      if (t > 0) harp(notes[2], 0.8, 0.026, t + 0.22);
+    }
+    // Flute countermelody (different from string notes — a counter line)
+    const fn = this.fluteNotes[fi % this.fluteNotes.length];
+    flute(fn, dur * 0.6, 0.045, 0.8);
+    if (dur > 5.5) flute(fn * (185/196), dur * 0.45, 0.032, dur * 0.62);
+  },
+};
+
+// ─────────────────────────────────────────────────────────
+// TRACK 5 — "Chronicle's Twilight"
+// F major (warm, not minor) · Violin + Flute dialogue · 6.5s
+// ─────────────────────────────────────────────────────────
+const T5 = {
+  name: "Chronicle's Twilight",
+  chordDur: 6.5,
+  cyclesPerRotation: 5,
+  prog: [
+    [Hz.F2,  Hz.A2,  Hz.C3,  Hz.F3,  Hz.A3,  Hz.C4],
+    [Hz.C3,  Hz.E3,  Hz.G3,  Hz.C4,  Hz.E4],
+    [Hz.D3,  Hz.F3,  Hz.A3,  Hz.D4,  Hz.F4],
+    [Hz.A2,  Hz.C3,  Hz.E3,  Hz.A3,  Hz.C4],
+    [Hz.Bb1, Hz.F2,  Hz.Bb2, Hz.D3,  Hz.F3,  Hz.Bb3],
+  ],
+  // Violin melody and flute melody alternate each chord
+  violinMelody: [Hz.C5, Hz.E5, Hz.D5, Hz.A4, Hz.Bb4||Hz.A4],
+  fluteMelody:  [Hz.F5, Hz.G5, Hz.F5, Hz.E5, Hz.D5],
+  play(notes, dur, fi) {
+    // Warm cello — F major is warmer, less dark
+    cello(notes[0] * 0.5, dur, 0.072, 0.6);
+    // Viola layer
+    notes.slice(1, 4).forEach((n, i) =>
+      violin(n, dur, 0.050, 3.5+i*0.4, 5.3, 0.45+i*0.08, i*3));
+    // Violin upper + melody in dialogue with flute
+    // Even chords: violin carries melody
+    // Odd chords: flute carries melody
+    if (fi % 2 === 0) {
+      // Violin melody phrase
+      const vm = this.violinMelody[fi % this.violinMelody.length];
+      violin(vm, dur * 0.72, 0.060, 5.5, 6.2, 0.28, 0);
+      violin(vm * (186/196), dur * 0.55, 0.038, 5.2, 6.0, 0.32, -8);
+      // Flute supports softly
+      flute(this.fluteMelody[fi % this.fluteMelody.length], dur * 0.40, 0.028, dur * 0.65);
+    } else {
+      // Flute melody phrase
+      const fm = this.fluteMelody[fi % this.fluteMelody.length];
+      flute(fm, dur * 0.68, 0.058, 0.25);
+      // Violin supports softly
+      violin(this.violinMelody[(fi+1) % this.violinMelody.length], dur * 0.42, 0.032, 4.8, 5.8, 0.45, 0);
+    }
+    // Harp waltz arpeggio — 3-note up and down
+    const arp = [notes[1], notes[2], notes[3] || notes[2]];
+    arp.forEach((n, i) => harp(n, dur * 0.3, 0.038, 0.4 + i * (dur * 0.25)));
+    arp.slice().reverse().forEach((n, i) => harp(n, dur * 0.25, 0.028, dur * 0.55 + i * (dur * 0.13)));
+  },
+};
+
+const TRACKS = [T1, T2, T3, T4, T5];
+
+// ─────────────────────────────────────────────────────────
+//  CROSSFADE — fade out current session, start new track
+// ─────────────────────────────────────────────────────────
+const FADE_DUR = 3.2; // seconds
+
+function crossfadeToNextTrack() {
+  if (!ctx) return;
+
+  // Determine next track — phase influences preference but doesn't override
+  const forcedByPhase = musicPhase === "tension" ? [1, 3] // T2, T4
+    : musicPhase === "epic" ? [3, 4]                      // T4, T5
+    : null;
+
+  let next;
+  if (forcedByPhase && Math.random() < 0.4) {
+    next = forcedByPhase[Math.floor(Math.random() * forcedByPhase.length)];
+  } else {
+    next = (trackIdx + 1) % TRACKS.length;
   }
-  // Harp arpeggios on tension
-  if (isTens) notes.slice(0, 4).forEach((n, i) => harp(n, dur * 0.45, 0.036, i * 0.18));
+  trackIdx = next;
+
+  // Fade out old session
+  const old = currentDest;
+  if (old) {
+    old.gain.linearRampToValueAtTime(0, ctx.currentTime + FADE_DUR);
+    setTimeout(() => { try { old.disconnect(); } catch {} }, (FADE_DUR + 1) * 1000);
+  }
+
+  // New session fades in
+  const newDest = makeSessionGain(0);
+  newDest.gain.linearRampToValueAtTime(1.0, ctx.currentTime + FADE_DUR);
+  currentDest = newDest;
+
+  chordInTrack = 0;
+  currentTrackName = TRACKS[trackIdx].name;
+}
+
+// ─────────────────────────────────────────────────────────
+//  MUSIC LOOP
+// ─────────────────────────────────────────────────────────
+function scheduleNextTrack(delayMs = 0) {
+  if (musicTimer) clearTimeout(musicTimer);
+  musicTimer = setTimeout(musicLoop, delayMs);
 }
 
 function musicLoop() {
-  if (!ctx) { setTimeout(musicLoop, 5000); return; }
-  const prog = PROGS[musicPhase] || PROGS.calm;
-  const name = prog[chordIdx % prog.length];
-  const dur  = musicPhase === "calm" ? 6.5 : musicPhase === "tension" ? 5.0 : 4.2;
-  chordIdx++;
-  if (!_muted) playChord(name, dur);
-  setTimeout(musicLoop, (dur - 0.5) * 1000);
+  if (!ctx || !currentDest) { scheduleNextTrack(5000); return; }
+
+  const track = TRACKS[trackIdx];
+  const dur   = track.chordDur * (musicPhase === "tension" ? 0.85 : musicPhase === "epic" ? 0.75 : 1.0);
+  const chord = track.prog[chordInTrack % track.prog.length];
+
+  if (!_muted) track.play(chord, dur, chordInTrack);
+
+  chordInTrack++;
+
+  // After cycling through all chords N times, crossfade to next track
+  const totalChords = track.prog.length * track.cyclesPerRotation;
+  if (chordInTrack >= totalChords) crossfadeToNextTrack();
+
+  scheduleNextTrack((dur - 0.45) * 1000);
 }
 
-function startScore() { setTimeout(musicLoop, 1400); }
+// ─────────────────────────────────────────────────────────
+//  GAME PHASE
+// ─────────────────────────────────────────────────────────
+export function setMusicPhase(p) { musicPhase = p; }
 
-// ─── SFX ────────────────────────────────────────────────
+export function updateMusicFromGame(moveNum, status, captures) {
+  if (!ctx) return;
+  if (status === "checkmate" || status === "stalemate" || status === "draw") {
+    musicGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 3); return;
+  }
+  const prev = musicPhase;
+  musicPhase = status === "check"           ? "tension"
+             : moveNum > 20 || captures > 6 ? "epic"
+             : moveNum > 10 || captures > 2 ? "tension"
+             : "calm";
+  const vol = musicPhase === "calm" ? 0.44 : musicPhase === "tension" ? 0.52 : 0.60;
+  musicGain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 2.5);
+  // Phase escalation also accelerates track transition
+  if (prev === "calm" && musicPhase === "epic") {
+    chordInTrack = Math.max(chordInTrack, TRACKS[trackIdx].prog.length * (TRACKS[trackIdx].cyclesPerRotation - 1));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  SFX — unchanged, routed to sfxGain (not sessionGain)
+// ─────────────────────────────────────────────────────────
+
+// Helper for sfx that uses sfxGain, not currentDest
+function sfxViolin(freq, dur, vol, vibD, vibR, atk, detune) {
+  violin(freq, dur, vol, vibD, vibR, atk, detune, sfxGain);
+}
+function sfxHarp(freq, dur, vol, delay) { harp(freq, dur, vol, delay, sfxGain); }
+function sfxFlute(freq, dur, vol, delay) { flute(freq, dur, vol, delay, sfxGain); }
+
 export function sfxMove(isCapture = false, isCrossRealm = false) {
   if (!ctx) return;
   if (isCrossRealm) { sfxRealmTranscend(); return; }
-  if (isCapture)    { sfxCapture();        return; }
-  harp(F.A4, 0.85, 0.05, 0);
-  harp(F.E5, 0.65, 0.026, 0.045);
+  if (isCapture)    { sfxCapture(); return; }
+  sfxHarp(Hz.A4, 0.85, 0.055, 0);
+  sfxHarp(Hz.E5, 0.65, 0.028, 0.045);
 }
 
 export function sfxCapture() {
   if (!ctx) return;
-  violin(F.A4, 0.55, 0.065, 8, 6.5, 0.04);
-  violin(F.Bb3, 0.5,  0.052, 6, 6,   0.05);
-  harp(F.D4, 1.0, 0.045, 0.38);
+  sfxViolin(Hz.A4,  0.55, 0.068, 8, 6.5, 0.04, 0);
+  sfxViolin(Hz.Bb3, 0.50, 0.054, 6, 6.0, 0.05, 0);
+  sfxHarp(Hz.D4, 1.0, 0.046, 0.38);
 }
 
 export function sfxRealmTranscend() {
   if (!ctx) return;
-  [F.D4,F.F4,F.A4,F.D5,F.F5,F.A5].forEach((f, i) => flute(f, 0.55, 0.048+i*0.004, i * 0.1));
-  [F.A5,F.C6,F.A5].forEach((f, i) => violin(f, 1.6, 0.022, 6, 7, 0.3, i*8));
-  [F.D4,F.F4,F.A4,F.D5].forEach((f, i) => harp(f, 1.3, 0.04, i * 0.09));
+  [Hz.D4,Hz.F4,Hz.A4,Hz.D5,Hz.F5,Hz.A5].forEach((f, i) =>
+    sfxFlute(f, 0.55, 0.048+i*0.004, i * 0.1));
+  [Hz.A5,Hz.C6,Hz.A5].forEach((f, i) =>
+    sfxViolin(f, 1.6, 0.022, 6, 7, 0.3, i*8));
+  [Hz.D4,Hz.F4,Hz.A4,Hz.D5].forEach((f, i) =>
+    sfxHarp(f, 1.3, 0.040, i * 0.09));
 }
 
 export function sfxCheck() {
   if (!ctx) return;
-  violin(F.E5, 0.7, 0.075, 5, 6, 0.04);
-  setTimeout(() => { violin(F.F5, 1.1, 0.07, 5, 6, 0.04); flute(F.F5, 0.8, 0.048); }, 260);
-  cello(F.D2, 1.4, 0.058, 0.07);
+  sfxViolin(Hz.E5, 0.7, 0.078, 5, 6, 0.04, 0);
+  setTimeout(() => {
+    sfxViolin(Hz.F5, 1.1, 0.072, 5, 6, 0.04, 0);
+    sfxFlute(Hz.F5, 0.8, 0.050, 0);
+  }, 260);
+  sfxViolin(Hz.D2, 1.4, 0.060, 2.2, 4, 0.08, 0);
 }
 
 export function sfxCheckmate() {
   if (!ctx) return;
-  cello(F.D2, 4.2, 0.10, 0.28); cello(F.A2, 4.0, 0.082, 0.34);
-  [F.D3,F.F3,F.A3,F.D4,F.F4].forEach((f, i) => violin(f, 3.8, 0.068-i*0.006, 5, 5.5, 0.42+i*0.08, i*5));
-  [F.A4,F.D5,F.F5].forEach((f, i) => violin(f, 3.4, 0.048, 5.5, 5.8, 0.55+i*0.1, -i*6));
-  [F.D4,F.F4,F.A4,F.D5,F.F5,F.A5].forEach((f, i) => flute(f, 0.65, 0.058, 0.65+i*0.27));
-  [F.D4,F.F4,F.A4,F.D5,F.F5,F.D5,F.A4,F.F4].forEach((f, i) => harp(f, 1.7, 0.042, 0.4+i*0.14));
+  sfxViolin(Hz.D2, 4.2, 0.10, 2.2, 4, 0.28, 0);
+  sfxViolin(Hz.A2, 4.0, 0.085, 2.2, 4, 0.34, 0);
+  [Hz.D3,Hz.F3,Hz.A3,Hz.D4,Hz.F4].forEach((f, i) =>
+    sfxViolin(f, 3.8, 0.068-i*0.006, 5, 5.5, 0.42+i*0.08, i*5));
+  [Hz.A4,Hz.D5,Hz.F5].forEach((f, i) =>
+    sfxViolin(f, 3.4, 0.048, 5.5, 5.8, 0.55+i*0.1, -i*6));
+  [Hz.D4,Hz.F4,Hz.A4,Hz.D5,Hz.F5,Hz.A5].forEach((f, i) =>
+    sfxFlute(f, 0.65, 0.058, 0.65+i*0.27));
+  [Hz.D4,Hz.F4,Hz.A4,Hz.D5,Hz.F5,Hz.D5,Hz.A4,Hz.F4].forEach((f, i) =>
+    sfxHarp(f, 1.7, 0.042, 0.4+i*0.14));
 }
 
 export function sfxGameStart() {
   if (!ctx) return;
-  [F.D3,F.F3,F.A3,F.D4,F.F4,F.A4,F.D5].forEach((f, i) => harp(f, 2.4-i*0.18, 0.052, i*0.13));
+  [Hz.D3,Hz.F3,Hz.A3,Hz.D4,Hz.F4,Hz.A4,Hz.D5].forEach((f, i) =>
+    sfxHarp(f, 2.4-i*0.18, 0.052, i*0.13));
   setTimeout(() => {
-    cello(F.D2, 3.5, 0.072, 0.6);
-    violin(F.A4, 2.8, 0.052, 4, 5.5, 0.52);
-    flute(F.D5, 2.6, 0.048);
+    sfxViolin(Hz.D2, 3.5, 0.075, 2.2, 4, 0.6, 0);
+    sfxViolin(Hz.A4, 2.8, 0.055, 4.0, 5.5, 0.52, 0);
+    sfxFlute(Hz.D5, 2.6, 0.050, 0);
   }, 950);
 }
 
 export function sfxPromotion() {
   if (!ctx) return;
-  [F.D5,F.F5,F.A5,F.D5,F.A5].forEach((f, i) => flute(f, 0.52, 0.058, i*0.17));
-  [F.D4,F.A4,F.D5].forEach((f, i) => harp(f, 1.1, 0.042, i*0.1));
+  [Hz.D5,Hz.F5,Hz.A5,Hz.D5,Hz.A5].forEach((f, i) =>
+    sfxFlute(f, 0.52, 0.060, i*0.17));
+  [Hz.D4,Hz.A4,Hz.D5].forEach((f, i) =>
+    sfxHarp(f, 1.1, 0.044, i*0.1));
 }
 
 export function sfxAiThinking() {
   if (!ctx) return;
-  cello(F.D2 * 0.5, 1.7, 0.036, 0.85);
-}
-
-export function updateMusicFromGame(moveNum, status, captures) {
-  if (!ctx) return;
-  if (status === "checkmate" || status === "stalemate") {
-    musicGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 3); return;
-  }
-  musicPhase = status === "check"           ? "tension"
-             : moveNum > 20 || captures > 6 ? "epic"
-             : moveNum > 10 || captures > 2 ? "tension"
-             : "calm";
-  const vol = musicPhase === "calm" ? 0.42 : musicPhase === "tension" ? 0.50 : 0.57;
-  musicGain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 2.5);
+  sfxViolin(Hz.D2 * 0.5, 1.7, 0.036, 2.2, 4, 0.85, 0);
 }
