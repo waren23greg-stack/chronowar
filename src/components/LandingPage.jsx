@@ -111,7 +111,7 @@ function Ornament() {
 }
 
 // ── Main component ────────────────────────────────────────
-export default function LandingPage({ onPlay }) {
+export default function LandingPage({ onPlay, onTour }) {
   const [phase, setPhase] = useState(0); // 0=hidden 1=hero 2=all
   const [hovBtn, setHovBtn] = useState(false);
   const heroRef = useRef(null);
@@ -233,48 +233,61 @@ export default function LandingPage({ onPlay }) {
         </p>
 
         {/* CTA */}
-        <button
-          onClick={onPlay}
-          onMouseEnter={() => setHovBtn(true)}
-          onMouseLeave={() => setHovBtn(false)}
-          style={{
-            position: "relative",
-            background: hovBtn
-              ? "rgba(200,144,48,.18)"
-              : "rgba(180,124,32,.10)",
-            border: `1.5px solid rgba(200,148,40,${hovBtn ? ".7" : ".45"})`,
-            color: hovBtn ? "#f0d060" : "#d4a843",
-            padding: "20px 64px",
-            fontFamily: "'Cinzel', serif",
-            fontSize: ".82rem",
-            letterSpacing: "6px",
-            borderRadius: 3,
-            cursor: "pointer",
-            transition: "all .28s ease",
-            transform: hovBtn ? "translateY(-3px)" : "none",
-            boxShadow: hovBtn
-              ? "0 0 48px rgba(200,148,40,.2), 0 12px 40px rgba(0,0,0,.5), inset 0 0 30px rgba(200,148,40,.06)"
-              : "0 4px 24px rgba(0,0,0,.4)",
-            letterSpacing: "7px",
-            opacity: phase >= 1 ? 1 : 0,
-            marginBottom: 16,
-          }}
-        >
-          ENTER THE WAR
-          {/* Animated corner accents */}
-          {["tl","tr","bl","br"].map(p => (
-            <span key={p} style={{
-              position: "absolute",
-              width: 8, height: 8,
-              borderColor: "rgba(200,148,40,.6)",
-              borderStyle: "solid",
-              borderWidth: 0,
-              ...(p[0]==="t" ? { top: -1 } : { bottom: -1 }),
-              ...(p[1]==="l" ? { left: -1, borderLeftWidth: 1.5, borderTopWidth: p[0]==="t" ? 1.5 : 0, borderBottomWidth: p[0]==="b" ? 1.5 : 0 }
-                             : { right: -1, borderRightWidth: 1.5, borderTopWidth: p[0]==="t" ? 1.5 : 0, borderBottomWidth: p[0]==="b" ? 1.5 : 0 }),
-            }} />
-          ))}
-        </button>
+        <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
+          <button
+            onClick={onPlay}
+            onMouseEnter={() => setHovBtn(true)}
+            onMouseLeave={() => setHovBtn(false)}
+            style={{
+              position: "relative",
+              background: hovBtn ? "rgba(200,144,48,.18)" : "rgba(180,124,32,.10)",
+              border: `1.5px solid rgba(200,148,40,${hovBtn ? ".7" : ".45"})`,
+              color: hovBtn ? "#f0d060" : "#d4a843",
+              padding: "20px 64px",
+              fontFamily: "'Cinzel', serif",
+              fontSize: ".82rem",
+              letterSpacing: "7px",
+              borderRadius: 3,
+              cursor: "pointer",
+              transition: "all .28s ease",
+              transform: hovBtn ? "translateY(-3px)" : "none",
+              boxShadow: hovBtn
+                ? "0 0 48px rgba(200,148,40,.2), 0 12px 40px rgba(0,0,0,.5)"
+                : "0 4px 24px rgba(0,0,0,.4)",
+              opacity: phase >= 1 ? 1 : 0,
+            }}
+          >
+            ENTER THE WAR
+            {["tl","tr","bl","br"].map(p => (
+              <span key={p} style={{
+                position:"absolute", width:8, height:8,
+                borderColor:"rgba(200,148,40,.6)", borderStyle:"solid", borderWidth:0,
+                ...(p[0]==="t" ? {top:-1}:{bottom:-1}),
+                ...(p[1]==="l" ? {left:-1,borderLeftWidth:1.5,borderTopWidth:p[0]==="t"?1.5:0,borderBottomWidth:p[0]==="b"?1.5:0}
+                               : {right:-1,borderRightWidth:1.5,borderTopWidth:p[0]==="t"?1.5:0,borderBottomWidth:p[0]==="b"?1.5:0}),
+              }} />
+            ))}
+          </button>
+
+          {onTour && (
+            <button onClick={onTour} style={{
+              background: "rgba(100,60,160,.08)",
+              border: "1.5px solid rgba(140,80,220,.35)",
+              color: "rgba(180,120,255,.75)",
+              padding: "20px 36px",
+              fontFamily: "'Cinzel', serif",
+              fontSize: ".72rem", letterSpacing: "5px",
+              borderRadius: 3, cursor: "pointer",
+              transition: "all .28s ease",
+              opacity: phase >= 1 ? 1 : 0,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background="rgba(120,70,200,.14)"; e.currentTarget.style.color="rgba(200,150,255,.9)"; e.currentTarget.style.transform="translateY(-2px)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background="rgba(100,60,160,.08)"; e.currentTarget.style.color="rgba(180,120,255,.75)"; e.currentTarget.style.transform="none"; }}
+            >
+              ⚔ PRO TOUR
+            </button>
+          )}
+        </div>
 
         <div style={{
           fontFamily: "'Cinzel', serif", fontSize: "11px",

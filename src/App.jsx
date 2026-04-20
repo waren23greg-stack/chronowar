@@ -26,6 +26,8 @@ import LandingPage from "./components/LandingPage";
 import Tutorial from "./components/Tutorial";
 import ChronicleCard from "./components/ChronicleCard";
 import MobileLayout from "./components/MobileLayout";
+import ProTour, { TOUR_CHALLENGES } from "./components/ProTour";
+import { AuthModal, ProfileBar, getSession, getProfile, updateAccountStats, clearSession } from "./accounts.jsx";
 import {
   PointsHUD, RankUpToast, PostGameReport,
   detectRankUp, getRank, POINTS,
@@ -125,8 +127,46 @@ export default function App() {
     window.addEventListener("resize", fn);
     return () => window.removeEventListener("resize", fn);
   }, []);
-  const [screen, setScreen]         = useState("landing"); // "landing" | "game"
+  const [screen, setScreen]             = useState("landing"); // "landing"|"game"|"tour"
   const [showTutorial, setShowTutorial] = useState(false);
+
+  // ── Accounts ──
+  const [profile, setProfile]       = useState(() => {
+    const sess = getSession();
+    return sess ? getProfile(sess) : null;
+  });
+  const [showAuth, setShowAuth]     = useState(false);
+
+  // Sync account stats on game end
+  const syncAccountStats = (newStats) => {
+    if (profile) {
+      updateAccountStats(profile.username, newStats);
+      setProfile(prev => prev ? { ...prev, stats: { ...prev.stats, ...newStats } } : null);
+    }
+  };
+
+  // ── Pro Tour ──
+  const [tourProgress, setTourProgress] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("cw_tour_v1") || "{}"); } catch { return {}; }
+  });
+  const [activeTourChallenge, setActiveTourChallenge] = useState(null);
+
+  const startTourChallenge = (challenge) => {
+    setActiveTourChallenge(challenge);
+    setDifficulty(challenge.difficulty);
+    reset();
+    if (challenge.setup) {
+      const custom = challenge.setup(initBoards());
+      setBoards(custom);
+    }
+    setScreen("game");
+  };
+
+  const completeTourChallenge = (challengeId) => {
+    const next = { ...tourProgress, [challengeId]: true };
+    setTourProgress(next);
+    try { localStorage.setItem("cw_tour_v1", JSON.stringify(next)); } catch {}
+  };
 
   // ── Points ──
   const [stats, setStats]         = useState(() => loadStats());
@@ -216,8 +256,8 @@ export default function App() {
     const newClock = shouldResetClock(movePiece, capPiece, isCrossRealm) ? 0 : clock50Ref.current + 1;
     setClock50(newClock);
 
-    // Position history (threefold)
-    const hash = hashBoards(finalNb);
+    // Position history (threefold) — include side-to-move in hash
+    const hash = hashBoards(finalNb) + ":" + newTurn[0];
     const newPosHist = [...posHistRef.current, hash];
     setPosHistory(newPosHist);
 
@@ -243,8 +283,8 @@ export default function App() {
 
     const newTurn   = currentTurn === "white" ? "black" : "white";
     const num       = currentMoveNum + 1;
-    const newCheck  = inCheck(nb, newTurn === "white");
-    const hasLegal  = hasAnyLegal(nb, newTurn === "white");
+    const newCheck  = inCheck(finalNb, newTurn === "white");  // ← was nb
+    const hasLegal  = hasAnyLegal(finalNb, newTurn === "white");  // ← was nb
     // Draw detection
     const isRepetition = checkRepetition(newPosHist);
     const isClockDraw  = newClock >= 50;
@@ -266,7 +306,7 @@ export default function App() {
     };
 
     setLastMove({ fRealm: fromRealm, fRow: fromRow, fCol: fromCol, tRealm: toRealm, tRow: toRow, tCol: toCol });
-    setBoards(nb);
+    setBoards(finalNb);  // ← was nb — convergence removals now actually applied
     setTurn(newTurn);
     setMoveNum(num);
     setStatus(newStatus);
@@ -294,6 +334,12 @@ export default function App() {
       });
       const endGain = endStats.cp - _ws.cp;
       setStats(endStats);
+      syncAccountStats(endStats);
+      // Tour challenge completion
+      if (activeTourChallenge && result === "win") {
+        completeTourChallenge(activeTourChallenge.id);
+        setActiveTourChallenge(null);
+      }
       // Rank-up detection
       const _rankUp = detectRankUp(_ws.cp, endStats.cp);
       if (_rankUp) setTimeout(() => setRankUpData(_rankUp), 2400);
@@ -376,7 +422,7 @@ export default function App() {
     ensureAudio();
     setActiveRealm(realm);
     if (!audioReady && moveNum === 0) { bootAudio(); setAudioReady(true); sfxGameStart(); }
-    if (status === "checkmate" || status === "stalemate") return;
+    if (status === "checkmate" || status === "stalemate" || status === "draw") return;
     if (mode === "vs-ai" && turn === "black") return;
     const piece = boards[realm][row][col];
 
@@ -444,11 +490,16 @@ export default function App() {
     status === "checkmate" ? "☠ CHECKMATE!" :
     status === "check"     ? "⚠ CHECK!" :
     status === "stalemate" ? "⚖ STALEMATE" :
+    status === "draw"      ? `⚖ DRAW${drawReason === "repetition" ? " — REPETITION" : drawReason === "clock-50" ? " — 50 MOVES" : ""}` :
     aiThinking             ? aiTaunt || "…" :
     `Move ${moveNum}`;
 
   if (screen === "landing") {
-    return <LandingPage onPlay={() => setScreen("game")} />;
+    return <LandingPage onPlay={() => setScreen("game")} onTour={() => setScreen("tour")} />;
+  }
+
+  if (screen === "tour") {
+    return <ProTour tourProgress={tourProgress} onStartChallenge={startTourChallenge} onBack={() => setScreen("game")} />;
   }
 
   // ── Mobile layout ──
@@ -543,6 +594,9 @@ export default function App() {
                 ))}
               </div>
             )}
+            <button className="cw-tutorial-btn" onClick={() => setScreen("tour")} title="Pro Tour">
+              ⚔ PRO TOUR
+            </button>
             <button className={`cw-mute-btn ${muted ? "muted" : ""}`} onClick={toggleMute} title={muted ? "Unmute" : "Mute"}>
               {muted ? "🔇" : "🔊"}
             </button>
@@ -550,6 +604,7 @@ export default function App() {
               ? HOW TO PLAY
             </button>
             <button className="cw-home-btn" onClick={() => setScreen("landing")} title="Home">⌂</button>
+            <ProfileBar profile={profile} onLogout={() => { clearSession(); setProfile(null); }} onShowAuth={() => setShowAuth(true)} />
           </div>
 
           <div className="cw-status-bar">
@@ -562,6 +617,29 @@ export default function App() {
             </span>
           </div>
         </header>
+
+        {/* ── Tour Challenge Banner ── */}
+        {activeTourChallenge && (
+          <div style={{
+            background: "rgba(180,130,30,.15)", borderBottom: "1px solid rgba(180,130,30,.25)",
+            padding: "6px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
+            fontFamily: "'Cinzel', serif",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: ".42rem", letterSpacing: "4px", color: "rgba(130,90,20,.6)" }}>PRO TOUR · CHALLENGE {activeTourChallenge.num}</span>
+              <span style={{ fontSize: ".62rem", color: "#2a1004", letterSpacing: "2px", fontWeight: 700 }}>{activeTourChallenge.title}</span>
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span style={{ fontSize: ".42rem", color: "rgba(130,90,20,.55)", letterSpacing: "2px" }}>+{activeTourChallenge.cpReward} CP on win</span>
+              <button onClick={() => { setActiveTourChallenge(null); reset(); }} style={{
+                background: "rgba(0,0,0,.1)", border: "1px solid rgba(100,70,20,.2)",
+                borderRadius: 5, padding: "3px 10px", cursor: "pointer",
+                fontFamily: "'Cinzel', serif", fontSize: ".4rem", letterSpacing: "2px",
+                color: "rgba(80,55,20,.6)",
+              }}>ABANDON</button>
+            </div>
+          </div>
+        )}
 
         {/* ── Boards ── */}
         <main className="cw-main">
@@ -661,6 +739,7 @@ export default function App() {
         />
       )}
       {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+      {showAuth && <AuthModal onLogin={(p) => { setProfile(p); setShowAuth(false); }} onClose={() => setShowAuth(false)} />}
       <RankUpToast rankUpData={rankUpData} onDismiss={() => setRankUpData(null)} />
     </div>
   );
