@@ -49,21 +49,149 @@ function defaultStats() {
 
 // ── Points table ──────────────────────────────────────────────
 export const POINTS = {
-  capture:       5,
-  captureRook:   10,
-  captureQueen:  18,
-  crossRealm:    8,
-  check:         10,
-  promotion:     15,
-  win_easy:      30,
-  win_medium:    55,
-  win_hard:      100,
-  win_2player:   40,
-  draw:          10,
-  loss:          2,
-  fast_win:      30,
-  streak_bonus:  15,
-  brilliant_game:25,
+  // Move events
+  capture:         5,
+  captureRook:    12,
+  captureQueen:   22,
+  crossRealm:      8,
+  check:          10,
+  promotion:      15,
+  brilliant_game: 30,
+
+  // Win rewards
+  win_easy:       30,
+  win_medium:     65,
+  win_hard:      130,
+  win_2player:    45,
+  fast_win:       35,       // win ≤15 moves bonus
+  streak_bonus:   20,       // every 3-win streak
+
+  // Draw outcomes (varies by difficulty)
+  draw_easy:     -12,       // draw vs easy = bad
+  draw_medium:    15,       // respectable
+  draw_hard:      40,       // excellent
+  draw_2player:   10,
+
+  // Loss penalties
+  loss_easy:     -20,       // should beat easy
+  loss_medium:   -10,       // learning experience
+  loss_hard:      +5,       // noble loss
+  loss_2player:  -8,
+
+  // Resign / quit penalty
+  resign:        -35,
+  resign_early:  -55,       // quit before move 10
+};
+
+// ── AI Personalities ───────────────────────────────────────────
+export const AI_PERSONA = {
+  easy: {
+    name:     "The Apprentice",
+    faction:  "Shade of the Fallen",
+    icon:     "🌑",
+    color:    "#7a8a9a",
+    eloRating: 900,
+    thinking: [
+      "The Apprentice stirs in the shadows…",
+      "An uncertain hand moves across time…",
+      "The Shade considers its next step…",
+    ],
+    opening: [
+      "The war begins. Even an apprentice can surprise you.",
+      "I have studied the old chronicles. Let us write a new one.",
+      "Do not underestimate the shadows.",
+    ],
+    losing: [
+      "You fight with grace. The chronicles will remember this.",
+      "My pieces fall, but the war teaches me still.",
+      "A worthy demonstration. I shall study my defeat.",
+    ],
+    winning: [
+      "Perhaps the apprentice has learned something after all.",
+      "The timelines bend — even veterans can be humbled.",
+    ],
+    check: [
+      "Your King trembles. Yield.",
+      "The shadows close in around your throne.",
+      "A warning — heed it.",
+    ],
+    onResign: "The Shade watches you retreat. Learn from this. The realms demand more.",
+    description: "A novice spirit learning the dark arts. Forgiving errors, slow to punish.",
+  },
+
+  medium: {
+    name:     "Void Empress Nythera",
+    faction:  "Harbinger of the Conclave",
+    icon:     "♛",
+    color:    "#9030cc",
+    eloRating: 1250,
+    thinking: [
+      "Void Empress Nythera reads the threads of fate…",
+      "Nythera's void-sight pierces the veil of time…",
+      "The Empress calculates across three timelines…",
+    ],
+    opening: [
+      "Monarch Auris. Your throne is borrowed time.",
+      "Three realms, three fronts, one inevitable outcome. Begin.",
+      "The chronicles already know how this ends. Do you?",
+      "I have watched a thousand wars. This one is mine.",
+    ],
+    losing: [
+      "Unexpected. The void recalculates.",
+      "You have disrupted my convergence. I am… intrigued.",
+      "A warrior worth remembering. Do not mistake this for mercy.",
+    ],
+    winning: [
+      "Your Past is ashes. Your Present, rubble. Your Future — mine.",
+      "The void does not forgive hesitation.",
+      "Kneel before the Umbral Conclave. Your saga is over.",
+    ],
+    check: [
+      "CHECK. Feel the void close around your King.",
+      "Your King runs. There is nowhere left.",
+      "Nythera whispers — your King has no escape.",
+    ],
+    onResign: "Running already? The Void Empress expected more. Your name will be forgotten in the chronicles — if it was ever written at all.",
+    description: "A cunning strategist who punishes every mistake. Dangerous in all three realms.",
+  },
+
+  hard: {
+    name:     "Lich-Lord Vex'rath",
+    faction:  "Eternal Sovereign of the Umbral Conclave",
+    icon:     "☠",
+    color:    "#cc2020",
+    eloRating: 1600,
+    thinking: [
+      "Lich-Lord Vex'rath peers across all timelines simultaneously…",
+      "The Lich-Lord has played this war ten thousand times…",
+      "Vex'rath sees not your move — but your next twelve…",
+      "The eternal sovereign calculates your obliteration…",
+    ],
+    opening: [
+      "I have ended civilizations in the time it takes you to consider a move.",
+      "The Luminar Order. How quaint. How doomed.",
+      "Every piece you move, I have already countered in seventeen possible futures.",
+      "I have waited centuries for a worthy challenger. I doubt you are one.",
+    ],
+    losing: [
+      "…Impossible. The timelines do not show this outcome.",
+      "You have achieved what no mortal has in three hundred years. I am angered.",
+      "This is not over. No war against Vex'rath is ever truly over.",
+    ],
+    winning: [
+      "As the stars ordained. As the void always knew.",
+      "CHECKMATE. The Luminar Order is extinguished. The eternal war is mine.",
+      "Pathetic. Your King weeps alone across three abandoned realms.",
+    ],
+    check: [
+      "CHECK. Your King is already dead — it simply hasn't been told.",
+      "The trap was set twelve moves ago. You are only now realizing.",
+      "Feel that? That is inevitability.",
+      "Run, little King. Every square leads to darkness.",
+    ],
+    onResign: "COWARD. Ten thousand years of war and you cannot stomach defeat? The chronicles will record your shame for eternity.",
+    description: "An ancient, merciless intelligence. Masters all three realms simultaneously. Shows no mercy.",
+  },
 };
 
 // ── Rank helpers ──────────────────────────────────────────────

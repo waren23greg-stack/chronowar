@@ -27,6 +27,8 @@ import Tutorial from "./components/Tutorial";
 import ChronicleCard from "./components/ChronicleCard";
 import MobileLayout from "./components/MobileLayout";
 import ProTour, { TOUR_CHALLENGES } from "./components/ProTour";
+import AIChallengeScreen, { AI_PERSONAS, QUIT_PENALTY } from "./components/AIChallengeScreen";
+import { QuitConfirmation, OutcomeToast } from "./components/QuitModal";
 import { AuthModal, ProfileBar, getSession, getProfile, updateAccountStats, clearSession } from "./accounts.jsx";
 import {
   PointsHUD, RankUpToast, PostGameReport,
@@ -213,6 +215,12 @@ export default function App() {
   });
   const [showAuth, setShowAuth]     = useState(false);
 
+  // ── AI Challenge & quit state ──
+  const [showChallenge, setShowChallenge] = useState(false);
+  const [stance, setStance]               = useState("attack"); // "attack"|"defend"
+  const [showQuit, setShowQuit]           = useState(false);
+  const [outcomeToast, setOutcomeToast]   = useState(null); // {result,cpDelta,reason}
+
   // Sync account stats on game end
   const syncAccountStats = (newStats) => {
     if (profile) {
@@ -242,6 +250,34 @@ export default function App() {
     const next = { ...tourProgress, [challengeId]: true };
     setTourProgress(next);
     try { localStorage.setItem("cw_tour_v1", JSON.stringify(next)); } catch {}
+  };
+
+  // ── AI Challenge begin ──
+  const beginChallenge = ({ stance: s, difficulty: d }) => {
+    setStance(s);
+    setDifficulty(d);
+    setShowChallenge(false);
+    reset();
+    // Defend = player is Black; flip AI to play White instead
+    if (s === "defend") {
+      // AI moves first — trigger immediately after reset
+      setTimeout(() => {
+        setTurn("white"); // AI is white
+      }, 50);
+    }
+  };
+
+  // ── Quit ──
+  const handleQuit = () => {
+    const penalty = mode === "vs-ai" ? (QUIT_PENALTY[difficulty] || -15) : 0;
+    // Apply quit penalty to stats
+    const newStats = { ...statsRef.current, cp: Math.max(0, statsRef.current.cp + penalty), streak: 0 };
+    saveStats(newStats);
+    setStats(newStats);
+    syncAccountStats(newStats);
+    setOutcomeToast({ result: "quit", cpDelta: penalty, reason: "Retreat — honour lost" });
+    setShowQuit(false);
+    setTimeout(() => { reset(); setScreen("game"); }, 2000);
   };
 
   // ── Points ──
@@ -412,13 +448,18 @@ export default function App() {
     if (newStatus === "checkmate" || newStatus === "stalemate" || newStatus === "draw") {
       setTimeout(() => sfxCheckmate(), 200);
       setTimeout(() => setShowOver(true), 1800);
-      // Award game-end points
-      const result = newStatus === "stalemate" ? "draw"
+      // Determine result
+      const result = newStatus === "draw" || newStatus === "stalemate" ? "draw"
                    : (isW(movePiece) ? "white" : "black") === currentTurn ? "win" : "loss";
+
+      // Stance modifier — defending (playing Black) earns bonus
+      const isDefending = stance === "defend" && mode === "vs-ai";
+
       const endStats = awardGameEnd(_ws, {
         result,
         difficulty: difficultyRef.current,
         moveCount: num, mode,
+        stanceBonus: isDefending && result === "win" ? 1.4 : 1.0,
         gameStats: {
           captures:   captureCount.current,
           crossRealm: crossRealmCount.current,
@@ -433,10 +474,16 @@ export default function App() {
         completeTourChallenge(activeTourChallenge.id);
         setActiveTourChallenge(null);
       }
+      // Outcome toast — shows immediately with CP delta
+      const persona = AI_PERSONAS[difficultyRef.current] || AI_PERSONAS.medium;
+      const toastReason = result === "win"   ? persona.winTaunt
+                        : result === "loss"  ? persona.loseTaunt
+                        : "The timelines stand equal.";
+      setTimeout(() => setOutcomeToast({ result, cpDelta: endGain, reason: toastReason }), 400);
       // Rank-up detection
       const _rankUp = detectRankUp(_ws.cp, endStats.cp);
       if (_rankUp) setTimeout(() => setRankUpData(_rankUp), 2400);
-      // Store report for PostGameReport overlay
+      // Store report
       setGameReport({
         result,
         difficulty: difficultyRef.current,
@@ -445,15 +492,15 @@ export default function App() {
         newElo:    endStats.elo,
         eloDelta:  endStats.elo - _ws.elo,
         cpGained:  Math.max(0, endGain),
+        cpLost:    Math.min(0, endGain),
         rankBefore: getRank(_ws.cp),
         rankAfter:  getRank(endStats.cp),
         promoted:  !!_rankUp,
         captures:   captureCount.current,
         crossRealm: crossRealmCount.current,
         checks:     checkCount.current,
-        temporalCheckmate: isTemporalMate,
+        stanceBonus: isDefending && result === "win",
       });
-      // Use endStats as base for move-event awards below
       _ws = endStats;
     } else if (newStatus === "check") {
       sfxCheck();
@@ -491,7 +538,8 @@ export default function App() {
     if (turnRef.current !== "black") return;
     if (statusRef.current !== "playing" && statusRef.current !== "check") return;
 
-    const taunts = AI_TAUNTS[difficultyRef.current] || AI_TAUNTS.medium;
+    const persona = AI_PERSONAS[difficultyRef.current] || AI_PERSONAS.medium;
+    const taunts  = persona.taunts;
     setAiTaunt(taunts[Math.floor(Math.random() * taunts.length)]);
     setAiThinking(true);
     sfxAiThinking();
@@ -717,9 +765,17 @@ export default function App() {
                 ))}
               </div>
             )}
+            <button className="cw-tutorial-btn" onClick={() => mode === "vs-ai" ? setShowChallenge(true) : null} title="AI Challenge">
+              🤖 AI CHALLENGE
+            </button>
             <button className="cw-tutorial-btn" onClick={() => setScreen("tour")} title="Pro Tour">
               ⚔ PRO TOUR
             </button>
+            {(status === "playing" || status === "check") && (
+              <button className="cw-mute-btn" onClick={() => setShowQuit(true)} title="Quit" style={{ color: "rgba(200,80,50,.7)", borderColor: "rgba(200,60,30,.2)" }}>
+                ✕ QUIT
+              </button>
+            )}
             <button className={`cw-mute-btn ${muted ? "muted" : ""}`} onClick={toggleMute} title={muted ? "Unmute" : "Mute"}>
               {muted ? "🔇" : "🔊"}
             </button>
@@ -864,6 +920,27 @@ export default function App() {
       )}
       {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
       {showAuth && <AuthModal onLogin={(p) => { setProfile(p); setShowAuth(false); }} onClose={() => setShowAuth(false)} />}
+      {showChallenge && (
+        <AIChallengeScreen
+          difficulty={difficulty} setDifficulty={setDifficulty}
+          onBegin={beginChallenge} onBack={() => setShowChallenge(false)}
+          playerStats={stats}
+        />
+      )}
+      {showQuit && (
+        <QuitConfirmation
+          difficulty={difficulty} mode={mode}
+          onConfirm={handleQuit} onCancel={() => setShowQuit(false)}
+        />
+      )}
+      {outcomeToast && (
+        <OutcomeToast
+          result={outcomeToast.result}
+          cpDelta={outcomeToast.cpDelta}
+          reason={outcomeToast.reason}
+          onDone={() => setOutcomeToast(null)}
+        />
+      )}
       <RankUpToast rankUpData={rankUpData} onDismiss={() => setRankUpData(null)} />
     </div>
   );
