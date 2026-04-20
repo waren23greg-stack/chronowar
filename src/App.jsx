@@ -460,7 +460,7 @@ export default function App() {
     setShowChronicle(true);
     setChronicleLoading(true);
     const winner = status === "checkmate" ? (turn === "white" ? "black" : "white") : "none";
-    const data = await generateBattleChronicle(storyLogRef.current, winner, moveNum);
+    const data = await generateBattleChronicle(storyLogRef.current, winner, moveNum, { captures: captureCount.current, crossRealm: crossRealmCount.current, checks: checkCount.current });
     setChronicleData(data);
     setChronicleLoading(false);
   };
