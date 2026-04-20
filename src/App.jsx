@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   REALMS, REALM_CFG, SYMBOLS, LORE,
   isW, isB, pt, initBoards, legalMoves, applyMove,
-  inCheck, hasAnyLegal,
+  inCheck, hasAnyLegal, KING_FLANK_BUDGET,
 } from "./engine";
 import { generateNarration } from "./narrative";
 import { getBestMove, getEasyMove } from "./ai";
@@ -48,6 +48,77 @@ const AI_TAUNTS = {
   medium: ["The Umbral Conclave calculates your doom…", "Void Empress Nythera sees your weakness…", "Dark forces converge…"],
   hard:   ["Lich-Lord Vex'rath pierces all three timelines…", "The Conclave has foreseen your end…", "Time bends to shadow's will…"],
 };
+
+// ── King Flank Budget HUD ──────────────────────────────────────
+function KingBudgetHUD({ kingFlankMoves, turn }) {
+  const F = "'Cinzel', serif";
+  const wUsed = kingFlankMoves.white, bUsed = kingFlankMoves.black;
+
+  const PipRow = ({ used, label, color, isActive }) => {
+    const left = KING_FLANK_BUDGET - used;
+    const critical = left <= 3;
+    const pipColor = critical ? (left <= 1 ? "#f44336" : "#ff9800") : color;
+    return (
+      <div style={{ marginBottom: 7 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+          <span style={{ fontSize:9, letterSpacing:1.5, fontFamily:F, textTransform:"uppercase",
+            color: isActive ? color : "rgba(130,100,45,.45)", fontWeight: isActive ? 700 : 400 }}>
+            {isActive ? "▶ " : ""}{label}
+          </span>
+          <span style={{ fontSize:11, fontFamily:F, fontWeight:700, color: pipColor }}>
+            {left}/{KING_FLANK_BUDGET}
+          </span>
+        </div>
+        <div style={{ display:"flex", gap:2 }}>
+          {Array.from({ length: KING_FLANK_BUDGET }).map((_, i) => {
+            const spent = i < used;
+            const c = spent ? "rgba(80,55,20,.2)" : pipColor;
+            return (
+              <div key={i} style={{
+                flex:1, height:8, borderRadius:2,
+                background: c,
+                border: spent ? "1px solid rgba(100,70,20,.15)" : `1px solid ${pipColor}55`,
+                opacity: spent ? 0.3 : 1,
+                transition: "all .35s",
+                boxShadow: (!spent && i === used) ? `0 0 5px ${pipColor}80` : "none",
+              }} />
+            );
+          })}
+        </div>
+        {critical && left > 0 && (
+          <div style={{ fontSize:9, color:pipColor, marginTop:3, fontFamily:F, letterSpacing:.5 }}>
+            ⚠ {left} move{left === 1 ? "" : "s"} remaining in flank realms
+          </div>
+        )}
+        {left === 0 && (
+          <div style={{ fontSize:9, color:"#f44336", marginTop:3, fontFamily:F, letterSpacing:.5 }}>
+            ✕ King is bound — flank budget exhausted
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{
+      background:"rgba(5,2,14,.92)",
+      border:"1px solid rgba(180,140,50,.2)",
+      borderRadius:8, padding:"10px 12px",
+    }}>
+      <div style={{ fontSize:9, letterSpacing:3, color:"rgba(140,105,40,.55)",
+        fontFamily:F, textTransform:"uppercase", marginBottom:9 }}>
+        ♔ King Flank Budget
+      </div>
+      <PipRow used={wUsed} label="Luminar (White)" color="#c8a840" isActive={turn==="white"} />
+      <PipRow used={bUsed} label="Umbral (Black)"  color="#9055cc" isActive={turn==="black"} />
+      <div style={{ fontSize:9, color:"rgba(110,85,35,.38)", marginTop:5,
+        fontFamily:F, lineHeight:1.6, letterSpacing:.4 }}>
+        King moves in Past Echoes &amp; Fate's Shadow count toward the 13-move limit.
+        At 0, the King is immovable in flank realms — temporal checkmate may follow.
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   // ── Game state ──
@@ -104,6 +175,8 @@ export default function App() {
   const [posHistory, setPosHistory]           = useState([]);
   const [clock50, setClock50]                 = useState(0);
   const [crossCount, setCrossCount]           = useState({ white: 0, black: 0 });
+  const [kingFlankMoves, setKingFlankMoves]   = useState({ white: 0, black: 0 });
+  const [temporalCheckmate, setTemporalCheckmate] = useState(false);
   const [drawReason, setDrawReason]           = useState(null);
   const [convergenceWarn, setConvergenceWarn] = useState([]);
   const [lastMoveByPiece, setLastMoveByPiece] = useState({});
@@ -111,11 +184,13 @@ export default function App() {
   const posHistRef    = useRef([]);
   const clock50Ref    = useRef(0);
   const crossCountRef = useRef({ white: 0, black: 0 });
+  const kingFlankRef  = useRef({ white: 0, black: 0 });
   const lmbpRef       = useRef({});
-  useEffect(() => { fatigueRef.current    = fatigueMap; },    [fatigueMap]);
-  useEffect(() => { posHistRef.current    = posHistory; },    [posHistory]);
-  useEffect(() => { clock50Ref.current    = clock50; },       [clock50]);
-  useEffect(() => { crossCountRef.current = crossCount; },    [crossCount]);
+  useEffect(() => { fatigueRef.current    = fatigueMap; },     [fatigueMap]);
+  useEffect(() => { posHistRef.current    = posHistory; },     [posHistory]);
+  useEffect(() => { clock50Ref.current    = clock50; },        [clock50]);
+  useEffect(() => { crossCountRef.current = crossCount; },     [crossCount]);
+  useEffect(() => { kingFlankRef.current  = kingFlankMoves; }, [kingFlankMoves]);
   useEffect(() => { lmbpRef.current       = lastMoveByPiece; }, [lastMoveByPiece]);
 
   // ── Game over overlay ──
@@ -239,6 +314,18 @@ export default function App() {
 
     const isCrossRealm = fromRealm !== toRealm;
 
+    // ── King Flank Budget tracking ──
+    const movingSide = isW(movePiece) ? "white" : "black";
+    const isKingFlankMove = pt(movePiece) === "K" && (fromRealm === "past" || fromRealm === "future");
+    const newKingFlank = isKingFlankMove
+      ? { ...kingFlankRef.current, [movingSide]: kingFlankRef.current[movingSide] + 1 }
+      : kingFlankRef.current;
+    if (isKingFlankMove) setKingFlankMoves(newKingFlank);
+    const kingBudget = {
+      white: KING_FLANK_BUDGET - newKingFlank.white,
+      black: KING_FLANK_BUDGET - newKingFlank.black,
+    };
+
     // ── Advanced Rules ──
     // Convergence removals first
     const { boards: nbClean, removed: convRemoved } =
@@ -287,12 +374,15 @@ export default function App() {
 
     const num       = currentMoveNum + 1;
     const newCheck  = inCheck(finalNb, newTurn === "white");  // ← was nb
-    const hasLegal  = hasAnyLegal(finalNb, newTurn === "white");  // ← was nb
+    const hasLegal  = hasAnyLegal(finalNb, newTurn === "white", kingBudget);
     // Draw detection
     const isRepetition = checkRepetition(newPosHist);
     const isClockDraw  = newClock >= 50;
+    // Temporal checkmate: King budget exhausted + no legal moves + not in traditional check
+    const isTemporalMate = !hasLegal && !newCheck && kingBudget[newTurn] <= 0;
+    if (isTemporalMate) setTemporalCheckmate(true);
     const newStatus = !hasLegal
-      ? (newCheck ? "checkmate" : "stalemate")
+      ? (newCheck || isTemporalMate ? "checkmate" : "stalemate")
       : isRepetition ? "draw"
       : isClockDraw  ? "draw"
       : newCheck     ? "check"
@@ -361,6 +451,7 @@ export default function App() {
         captures:   captureCount.current,
         crossRealm: crossRealmCount.current,
         checks:     checkCount.current,
+        temporalCheckmate: isTemporalMate,
       });
       // Use endStats as base for move-event awards below
       _ws = endStats;
@@ -409,7 +500,8 @@ export default function App() {
 
     const timer = setTimeout(() => {
       const b = boardsRef.current;
-      const m = difficultyRef.current === "easy" ? getEasyMove(b) : getBestMove(b, difficultyRef.current);
+      const _kb = { white: KING_FLANK_BUDGET - kingFlankRef.current.white, black: KING_FLANK_BUDGET - kingFlankRef.current.black };
+      const m = difficultyRef.current === "easy" ? getEasyMove(b, _kb) : getBestMove(b, difficultyRef.current, _kb);
       setAiThinking(false);
       setAiTaunt("");
       if (!m) return;
@@ -451,8 +543,20 @@ export default function App() {
       setSel(null); setMoves([]);
     }
     if (piece && (turn === "white" ? isW(piece) : isB(piece))) {
+      const budget = { white: KING_FLANK_BUDGET - kingFlankMoves.white, black: KING_FLANK_BUDGET - kingFlankMoves.black };
+      // King flank budget warning when selected with critically low budget
+      if (pt(piece) === "K" && (realm === "past" || realm === "future")) {
+        const left = budget[turn];
+        if (left <= 0) {
+          setNarr(`${turn === "white" ? "Monarch Auris the Eternal" : "Lich-Lord Vex'rath"} has exhausted all 13 temporal movements in the flank realms. The King is bound — their fate sealed by the laws of time.`);
+          return;
+        }
+        if (left <= 3) {
+          setNarr(`⚠ ${turn === "white" ? "Monarch Auris" : "Lich-Lord Vex'rath"} has only ${left} flank move${left === 1 ? "" : "s"} remaining in the temporal realms. Use them wisely — the clock of eternity runs short.`);
+        }
+      }
       setSel({ realm, row, col });
-      setMoves(legalMoves(boards, realm, row, col));
+      setMoves(legalMoves(boards, realm, row, col, budget));
     }
   };
 
@@ -480,6 +584,8 @@ export default function App() {
     checkCount.current      = 0;
     setFatigueMap({}); setPosHistory([]); setClock50(0);
     setCrossCount({ white: 0, black: 0 }); setDrawReason(null);
+    setKingFlankMoves({ white: 0, black: 0 }); kingFlankRef.current = { white: 0, black: 0 };
+    setTemporalCheckmate(false);
     setConvergenceWarn([]); setLastMoveByPiece({});
     updateMusicFromGame(0, "playing", 0);
     setNarr("A new war begins. The armies assume their eternal positions once more — let the chronicles be written anew…");
@@ -489,12 +595,20 @@ export default function App() {
   };
 
   const wTurn = turn === "white";
+  const wBudgetLeft = KING_FLANK_BUDGET - kingFlankMoves.white;
+  const bBudgetLeft = KING_FLANK_BUDGET - kingFlankMoves.black;
+  const currentBudgetLeft = wTurn ? wBudgetLeft : bBudgetLeft;
+  const budgetWarning = currentBudgetLeft <= 3 && currentBudgetLeft > 0 && status === "playing";
+
   const statusLabel =
+    status === "checkmate" && temporalCheckmate
+                           ? "⏳ TEMPORAL CHECKMATE!" :
     status === "checkmate" ? "☠ CHECKMATE!" :
     status === "check"     ? "⚠ CHECK!" :
     status === "stalemate" ? "⚖ STALEMATE" :
     status === "draw"      ? `⚖ DRAW${drawReason === "repetition" ? " — REPETITION" : drawReason === "clock-50" ? " — 50 MOVES" : ""}` :
     aiThinking             ? aiTaunt || "…" :
+    budgetWarning          ? `⚠ KING: ${currentBudgetLeft} FLANK MOVE${currentBudgetLeft === 1 ? "" : "S"} LEFT` :
     `Move ${moveNum}`;
 
   if (screen === "landing") {
@@ -669,6 +783,7 @@ export default function App() {
 
           <div className="cw-right-panel">
             <PointsHUD stats={stats} lastAward={lastAward} />
+            <KingBudgetHUD kingFlankMoves={kingFlankMoves} turn={turn} />
             <ChroniclePanel narrating={narrating || aiThinking} displayed={aiThinking ? aiTaunt : displayed} />
             <SagaScroll storyLog={storyLog} />
             <PieceLegend />

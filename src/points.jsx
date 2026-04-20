@@ -444,12 +444,15 @@ export function PostGameReport({ reportData, lastNarr, onNewGame, onChronicle })
     prevElo, newElo, eloDelta,
     cpGained, rankBefore, rankAfter, promoted,
     captures, crossRealm, checks,
+    temporalCheckmate = false,
   } = reportData;
 
   const accuracy = computeAccuracy({ captures, crossRealm, checks, totalMoves: moveCount, result });
   const accClass = classifyAccuracy(accuracy);
   const resultColor = result==="win" ? "#4caf50" : result==="loss" ? "#f44336" : "#ffc107";
-  const resultLabel = result==="win" ? "VICTORY" : result==="loss" ? "DEFEATED" : "STALEMATE";
+  const resultLabel = temporalCheckmate
+    ? "⏳ TEMPORAL DOOM"
+    : result==="win" ? "VICTORY" : result==="loss" ? "DEFEATED" : "STALEMATE";
   const F = "'Cinzel', serif";
 
   // SVG accuracy ring

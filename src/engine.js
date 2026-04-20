@@ -255,20 +255,30 @@ export function inCheck(boards, white) {
   return false;
 }
 
-export const legalMoves = (boards, realm, row, col) => {
+// ── King Flank Budget ─────────────────────────────────────────
+// Each King has exactly 13 moves in Past Echoes + Fate's Shadow combined.
+// kingBudget = { white: N, black: N } remaining moves. Pass null to skip.
+export const KING_FLANK_BUDGET = 13;
+
+export const legalMoves = (boards, realm, row, col, kingBudget = null) => {
   const p = boards[realm][row][col];
   if (!p) return [];
+  // King in flank realm with budget exhausted → zero moves (immovable)
+  if (kingBudget !== null && pt(p) === "K" && (realm === "past" || realm === "future")) {
+    const side = isW(p) ? "white" : "black";
+    if ((kingBudget[side] ?? KING_FLANK_BUDGET) <= 0) return [];
+  }
   return rawMoves(boards, realm, row, col).filter(
     (m) => !inCheck(applyMove(boards, realm, row, col, m.realm, m.row, m.col), isW(p))
   );
 };
 
-export const hasAnyLegal = (boards, white) => {
+export const hasAnyLegal = (boards, white, kingBudget = null) => {
   for (const r of REALMS)
     for (let i = 0; i < BS; i++)
       for (let j = 0; j < BS; j++) {
         const p = boards[r][i][j];
-        if (p && isW(p) === white && legalMoves(boards, r, i, j).length > 0)
+        if (p && isW(p) === white && legalMoves(boards, r, i, j, kingBudget).length > 0)
           return true;
       }
   return false;
