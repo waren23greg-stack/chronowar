@@ -256,6 +256,9 @@ export default function App() {
     const newClock = shouldResetClock(movePiece, capPiece, isCrossRealm) ? 0 : clock50Ref.current + 1;
     setClock50(newClock);
 
+    // newTurn must be declared before the hash that includes it
+    const newTurn   = currentTurn === "white" ? "black" : "white";
+
     // Position history (threefold) — include side-to-move in hash
     const hash = hashBoards(finalNb) + ":" + newTurn[0];
     const newPosHist = [...posHistRef.current, hash];
@@ -281,7 +284,6 @@ export default function App() {
     if (capPiece)
       setCaptured(prev => ({ ...prev, [isW(capPiece) ? "white" : "black"]: [...prev[isW(capPiece) ? "white" : "black"], capPiece] }));
 
-    const newTurn   = currentTurn === "white" ? "black" : "white";
     const num       = currentMoveNum + 1;
     const newCheck  = inCheck(finalNb, newTurn === "white");  // ← was nb
     const hasLegal  = hasAnyLegal(finalNb, newTurn === "white");  // ← was nb
