@@ -1,8 +1,14 @@
 // ============================================================
 //  CHRONOWAR — AI Engine
 //  Minimax with alpha-beta pruning across all 3 realms
+//  Upgraded with Temporal Entropy & AI Personality Profiles
 // ============================================================
 import { REALMS, BS, isW, pt, legalMoves, applyMove, inCheck, KING_FLANK_BUDGET } from "./engine";
+import { AI_PROFILES } from "./evaluateEntropy";
+import TemporalEngine from "./temporalEngine";
+
+// Initialize a standalone temporal engine specifically for AI tree simulations
+const aiTemporalEngine = new TemporalEngine();
 
 const PIECE_VALUE = { K:10000, Q:900, R:500, B:320, N:300, S:480, X:340, P:100 };
 const REALM_WEIGHT = { past:0.85, present:1.0, future:0.85 };
@@ -32,7 +38,8 @@ function spendKingBudget(kingBudget, piece, fromRealm) {
   return { ...kingBudget, [side]: Math.max(0, (kingBudget[side] ?? KING_FLANK_BUDGET) - 1) };
 }
 
-function evaluateBoard(boards, kingBudget = null) {
+// RENAMED from evaluateBoard to preserve your excellent physical chess logic
+function calculateClassicScore(boards, kingBudget = null) {
   let score = 0;
   for (const realm of REALMS) {
     const rw = REALM_WEIGHT[realm];
@@ -60,6 +67,38 @@ function evaluateBoard(boards, kingBudget = null) {
   return score;
 }
 
+// NEW: The Temporal Bridge
+function evaluateBoard(boards, isWhiteToMove, kingBudget = null, currentTurnEntropy = null, aiProfileName = 'THE_TIME_WEAVER') {
+  // 1. Get your original physical board score
+  const classicScore = calculateClassicScore(boards, kingBudget);
+
+  // 2. Fetch timeline metrics
+  if (currentTurnEntropy) {
+    aiTemporalEngine.entropyState = { ...currentTurnEntropy };
+  }
+  const profile = AI_PROFILES[aiProfileName] || AI_PROFILES.THE_TIME_WEAVER;
+  const metrics = aiTemporalEngine.getMetrics(Math.abs(classicScore), 0);
+
+  let temporalScore = 0;
+  
+  // Apply AI Personality
+  temporalScore += metrics.momentum * profile.aggression;
+  temporalScore += (metrics.entropySummary.normalized * 20) * profile.entropy;
+  
+  const avgStability = (
+    metrics.pressure.stabilityMultipliers.past + 
+    metrics.pressure.stabilityMultipliers.present + 
+    metrics.pressure.stabilityMultipliers.future
+  ) / 3;
+  temporalScore += (avgStability * 50) * profile.defense;
+
+  // Make temporal score positive for White, negative for Black
+  const perspectiveMultiplier = isWhiteToMove ? 1 : -1;
+
+  // Final Blend: 40% Physical Chess, 60% Temporal Manipulation
+  return (classicScore * 0.4) + (temporalScore * perspectiveMultiplier * 0.6);
+}
+
 function getAllMoves(boards, white, kingBudget = null) {
   const moves = [];
   for (const realm of REALMS)
@@ -81,10 +120,13 @@ function orderMoves(boards, moves) {
   });
 }
 
-function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null) {
-  if (depth === 0) return { score: evaluateBoard(boards, kingBudget) };
+// UPDATED: Now receives AI profile and entropy, passing them down the tree
+function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null, aiProfileName = 'THE_TIME_WEAVER', currentEntropy = null) {
+  if (depth === 0) return { score: evaluateBoard(boards, maximizing, kingBudget, currentEntropy, aiProfileName) };
+  
   const white = maximizing;
   const moves = getAllMoves(boards, white, kingBudget);
+  
   if (moves.length === 0) {
     if (inCheck(boards, white)) return { score: maximizing ? -50000 + depth : 50000 - depth };
     // Temporal checkmate — budget exhausted, no moves → loss
@@ -95,14 +137,16 @@ function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null) {
     }
     return { score: 0 }; // stalemate
   }
+  
   const ordered = orderMoves(boards, moves);
   let best = null;
+  
   if (maximizing) {
     let maxScore = -Infinity;
     for (const m of ordered) {
       const nb = applyMove(boards, m.fromRealm, m.fromRow, m.fromCol, m.realm, m.row, m.col);
       const nextBudget = spendKingBudget(kingBudget, boards[m.fromRealm][m.fromRow][m.fromCol], m.fromRealm);
-      const { score } = minimax(nb, depth - 1, alpha, beta, false, nextBudget);
+      const { score } = minimax(nb, depth - 1, alpha, beta, false, nextBudget, aiProfileName, currentEntropy);
       if (score > maxScore) { maxScore = score; best = m; }
       alpha = Math.max(alpha, score);
       if (beta <= alpha) break;
@@ -113,7 +157,7 @@ function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null) {
     for (const m of ordered) {
       const nb = applyMove(boards, m.fromRealm, m.fromRow, m.fromCol, m.realm, m.row, m.col);
       const nextBudget = spendKingBudget(kingBudget, boards[m.fromRealm][m.fromRow][m.fromCol], m.fromRealm);
-      const { score } = minimax(nb, depth - 1, alpha, beta, true, nextBudget);
+      const { score } = minimax(nb, depth - 1, alpha, beta, true, nextBudget, aiProfileName, currentEntropy);
       if (score < minScore) { minScore = score; best = m; }
       beta = Math.min(beta, score);
       if (beta <= alpha) break;
@@ -124,15 +168,16 @@ function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null) {
 
 const DEPTH = { easy:1, medium:2, hard:3 };
 
-export function getBestMove(boards, difficulty = "medium", kingBudget = null) {
-  const result = minimax(boards, DEPTH[difficulty] || 2, -Infinity, Infinity, false, kingBudget);
+// UPDATED: Entry points now accept the current temporal state and AI personality
+export function getBestMove(boards, difficulty = "medium", kingBudget = null, aiProfileName = 'THE_BLOOD_MONARCH', currentEntropy = null) {
+  const result = minimax(boards, DEPTH[difficulty] || 2, -Infinity, Infinity, false, kingBudget, aiProfileName, currentEntropy);
   return result.move || null;
 }
 
-export function getEasyMove(boards, kingBudget = null) {
+export function getEasyMove(boards, kingBudget = null, aiProfileName = 'THE_TIME_WEAVER', currentEntropy = null) {
   const moves = getAllMoves(boards, false, kingBudget);
   if (!moves.length) return null;
   if (Math.random() < 0.4) return moves[Math.floor(Math.random() * moves.length)];
-  const result = minimax(boards, 1, -Infinity, Infinity, false, kingBudget);
+  const result = minimax(boards, 1, -Infinity, Infinity, false, kingBudget, aiProfileName, currentEntropy);
   return result.move || moves[0];
 }
