@@ -28,7 +28,6 @@ import ChronicleCard from "./components/ChronicleCard";
 import MobileLayout from "./components/MobileLayout";
 import ProTour, { TOUR_CHALLENGES } from "./components/ProTour";
 import AIChallengeScreen, { AI_PERSONAS, QUIT_PENALTY } from "./components/AIChallengeScreen";
-import { QuitConfirmation, OutcomeToast } from "./components/QuitModal";
 import { AuthModal, ProfileBar, getSession, getProfile, updateAccountStats, clearSession } from "./accounts.jsx";
 import {
   PointsHUD, RankUpToast, PostGameReport,
@@ -37,6 +36,15 @@ import {
 } from "./points.jsx";
 import "./App.css";
 import ChronowarLogo from "./components/ChronowarLogo";
+
+// ── NEW: Timeline Integration Imports ──
+import { TimelineHistory } from "./timelineSimulator";
+import HistoryRewritePanel from "./components/HistoryRewritePanel";
+import TemporalEngine from "./temporalEngine";
+
+// Initialize the master timeline ledgers globally so they persist
+const globalTimeline = new TimelineHistory();
+const globalTemporalEngine = new TemporalEngine();
 
 const STARS = Array.from({ length: 65 }, (_, i) => ({
   x: (i * 41.37 + 7.11) % 100, y: (i * 67.91 + 3.55) % 100,
@@ -133,6 +141,9 @@ export default function App() {
   const [moveNum, setMoveNum]     = useState(0);
   const [lastMove, setLastMove]   = useState(null);
   const [activeRealm, setActiveRealm] = useState("present");
+
+  // ── Timeline Shatter state ──
+  const [isRewritePanelOpen, setIsRewritePanelOpen] = useState(false);
 
   // ── Mode & difficulty ──
   const [mode, setMode]           = useState("vs-ai");   // "vs-ai" | "vs-player"
@@ -441,10 +452,18 @@ export default function App() {
     setStatus(newStatus);
     doNarration(info);
 
-    // ── Status audio ──
-    // Snapshot stats at move start (fixes stale closure)
+    // ── Timeline Snapshot ──
     let _ws = statsRef.current;
+    globalTimeline.recordState(
+      num,
+      finalNb.past,
+      finalNb.present,
+      finalNb.future,
+      globalTemporalEngine.entropyState,
+      _ws.cp
+    );
 
+    // ── Status audio ──
     if (newStatus === "checkmate" || newStatus === "stalemate" || newStatus === "draw") {
       setTimeout(() => sfxCheckmate(), 200);
       setTimeout(() => setShowOver(true), 1800);
@@ -618,6 +637,39 @@ export default function App() {
     setChronicleLoading(false);
   };
 
+  // ── Execute Timeline Rewrite ──
+  const executeTimelineRewrite = (targetTurn) => {
+    try {
+      const result = globalTimeline.rewriteHistory(targetTurn, stats.cp, 20);
+      
+      if (result.success) {
+        // 1. Pay the cost and sync
+        const newStats = { ...statsRef.current, cp: result.remainingCP };
+        setStats(newStats);
+        syncAccountStats(newStats);
+        
+        // 2. Restore the physical boards
+        setBoards(result.restoredReality.boards);
+        
+        // 3. Restore the entropy engine state
+        globalTemporalEngine.entropyState = { ...result.restoredReality.entropy };
+        
+        // 4. Update the game state & turn clock
+        setMoveNum(result.restoredReality.turn);
+        setTurn(result.restoredReality.turn % 2 === 0 ? "white" : "black");
+        setStatus("playing");
+        setSel(null);
+        setMoves([]);
+        setLastMove(null); 
+        
+        setNarr(`[REALITY SHATTERED] The timeline collapses. Resuming from Turn ${targetTurn}. The abandoned future is permanently erased.`);
+        sfxRealmTranscend();
+      }
+    } catch (error) {
+      console.error("Temporal Paradox Warning:", error.message);
+    }
+  };
+
   // ── Reset ──
   const reset = () => {
     if (twTimer.current) clearInterval(twTimer.current);
@@ -640,6 +692,7 @@ export default function App() {
     setNarrating(false); setAiThinking(false); setAiTaunt("");
     setShowOver(false); setShowChronicle(false); setChronicleData(null);
     setGameReport(null); setRankUpData(null);
+    globalTimeline.snapshots = []; // Clear history ledger on reset
   };
 
   const wTurn = turn === "white";
@@ -671,6 +724,16 @@ export default function App() {
   if (isMobile) {
     return (
       <div className="cw-root" data-realm={activeRealm}>
+        {/* Quick floating access to shatter timeline during testing */}
+        {status === "playing" && (
+           <button 
+             onClick={() => setIsRewritePanelOpen(true)}
+             className="absolute top-4 left-4 bg-purple-900/50 border border-purple-500 text-purple-200 px-3 py-1 rounded text-xs z-40"
+           >
+             Shatter Timeline
+           </button>
+        )}
+        
         <MobileLayout
           boards={boards} sel={sel} moves={moves} lastMove={lastMove}
           turn={turn} status={status} moveNum={moveNum}
@@ -726,222 +789,18 @@ export default function App() {
           />
         )}
         {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+        
+        {/* Timeline Rewrite Panel Overlay */}
+        <HistoryRewritePanel 
+          isOpen={isRewritePanelOpen}
+          onClose={() => setIsRewritePanelOpen(false)}
+          currentCP={stats.cp}
+          historyLength={globalTimeline.snapshots.length}
+          onExecuteRewrite={executeTimelineRewrite}
+        />
       </div>
     );
   }
-
-  return (
-    <div className="cw-root" data-realm={activeRealm}>
-      <div className="cw-stars">
-        {STARS.map((s, i) => (
-          <div key={i} className="cw-star" style={{ left:`${s.x}%`, top:`${s.y}%`, width:s.sz, height:s.sz, animationDuration:`${s.dur}s`, animationDelay:`${s.del}s` }} />
-        ))}
-      </div>
-
-      <div className="cw-content">
-        {/* ── Header ── */}
-        <header className="cw-header">
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:14 }}>
-            <ChronowarLogo size={48} showText={false} animate={false} />
-            <div>
-              <h1 className="cw-title">CHRONOWAR</h1>
-              <div className="cw-subtitle">THE CHRONICLES OF THREE REALMS</div>
-            </div>
-          </div>
-
-          {/* Mode + difficulty controls */}
-          <div className="cw-controls">
-            <div className="cw-mode-tabs">
-              {[["vs-ai","⚔ vs AI"],["vs-player","👥 2 Player"]].map(([m,l]) => (
-                <button key={m} onClick={() => { setMode(m); reset(); }}
-                  className={`cw-tab ${mode===m?"active":""}`}>{l}</button>
-              ))}
-            </div>
-            {mode === "vs-ai" && (
-              <div className="cw-diff-tabs">
-                {[["easy","EASY"],["medium","MEDIUM"],["hard","HARD"]].map(([d,l]) => (
-                  <button key={d} onClick={() => { setDifficulty(d); reset(); }}
-                    className={`cw-diff ${difficulty===d?"active":""} diff-${d}`}>{l}</button>
-                ))}
-              </div>
-            )}
-            <button className="cw-tutorial-btn" onClick={() => mode === "vs-ai" ? setShowChallenge(true) : null} title="AI Challenge">
-              🤖 AI CHALLENGE
-            </button>
-            <button className="cw-tutorial-btn" onClick={() => setScreen("tour")} title="Pro Tour">
-              ⚔ PRO TOUR
-            </button>
-            {(status === "playing" || status === "check") && (
-              <button className="cw-mute-btn" onClick={() => setShowQuit(true)} title="Quit" style={{ color: "rgba(200,80,50,.7)", borderColor: "rgba(200,60,30,.2)" }}>
-                ✕ QUIT
-              </button>
-            )}
-            <button className={`cw-mute-btn ${muted ? "muted" : ""}`} onClick={toggleMute} title={muted ? "Unmute" : "Mute"}>
-              {muted ? "🔇" : "🔊"}
-            </button>
-            <button className="cw-tutorial-btn" onClick={() => setShowTutorial(true)} title="How to Play">
-              ? HOW TO PLAY
-            </button>
-            <button className="cw-home-btn" onClick={() => setScreen("landing")} title="Home">⌂</button>
-            <ProfileBar profile={profile} onLogout={() => { clearSession(); setProfile(null); }} onShowAuth={() => setShowAuth(true)} />
-          </div>
-
-          <div className="cw-status-bar">
-            <span className={`cw-faction ${wTurn && !aiThinking ? "active" : ""}`}>
-              {wTurn && !aiThinking ? "▶ " : ""}⚪ LUMINAR ORDER
-            </span>
-            <span className={`cw-status-label status-${aiThinking?"thinking":status}`}>{statusLabel}</span>
-            <span className={`cw-faction ${!wTurn && !aiThinking ? "active-dark" : ""}`}>
-              UMBRAL CONCLAVE ⚫{!wTurn && !aiThinking ? " ◀" : ""}
-            </span>
-          </div>
-        </header>
-
-        {/* ── Tour Challenge Banner ── */}
-        {activeTourChallenge && (
-          <div style={{
-            background: "rgba(180,130,30,.15)", borderBottom: "1px solid rgba(180,130,30,.25)",
-            padding: "6px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
-            fontFamily: "'Cinzel', serif",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: ".42rem", letterSpacing: "4px", color: "rgba(130,90,20,.6)" }}>PRO TOUR · CHALLENGE {activeTourChallenge.num}</span>
-              <span style={{ fontSize: ".62rem", color: "#2a1004", letterSpacing: "2px", fontWeight: 700 }}>{activeTourChallenge.title}</span>
-            </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: ".42rem", color: "rgba(130,90,20,.55)", letterSpacing: "2px" }}>+{activeTourChallenge.cpReward} CP on win</span>
-              <button onClick={() => { setActiveTourChallenge(null); reset(); }} style={{
-                background: "rgba(0,0,0,.1)", border: "1px solid rgba(100,70,20,.2)",
-                borderRadius: 5, padding: "3px 10px", cursor: "pointer",
-                fontFamily: "'Cinzel', serif", fontSize: ".4rem", letterSpacing: "2px",
-                color: "rgba(80,55,20,.6)",
-              }}>ABANDON</button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Boards ── */}
-        <main className="cw-main">
-          <div className="cw-side-boards">
-            <RealmBoard realm="past" cfg={REALM_CFG.past} board={boards.past} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} sqSize={28} />
-            <div className="cw-portal-label">— TIME PORTAL —</div>
-            <RealmBoard realm="future" cfg={REALM_CFG.future} board={boards.future} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} sqSize={28} />
-          </div>
-
-          <div className="cw-center">
-            <RealmBoard realm="present" cfg={REALM_CFG.present} board={boards.present} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} sqSize={46} />
-            <div className="cw-captured">
-              <div className="cw-captured-side cw-captured-w">{captured.white.length ? captured.white.map(p=>SYMBOLS[p]).join("") : "—"}</div>
-              <div className="cw-captured-label">captured</div>
-              <div className="cw-captured-side cw-captured-b">{captured.black.length ? captured.black.map(p=>SYMBOLS[p]).join("") : "—"}</div>
-            </div>
-          </div>
-
-          <div className="cw-right-panel">
-            <PointsHUD stats={stats} lastAward={lastAward} />
-            <KingBudgetHUD kingFlankMoves={kingFlankMoves} turn={turn} />
-            <ChroniclePanel narrating={narrating || aiThinking} displayed={aiThinking ? aiTaunt : displayed} />
-            <SagaScroll storyLog={storyLog} />
-            <PieceLegend />
-            <button onClick={reset} className="cw-reset-btn">↺ NEW CHRONICLE</button>
-          </div>
-        </main>
-      </div>
-
-      {/* ── Game Over — Post-Game Report ── */}
-      {showOver && (
-        <PostGameReport
-          reportData={gameReport}
-          lastNarr={storyLog[0]?.t}
-          onNewGame={reset}
-          onChronicle={openChronicle}
-        />
-      )}
-
-      {/* ── Battle Chronicle Modal ── */}
-      {showChronicle && (
-        <div className="cw-overlay" onClick={() => setShowChronicle(false)}>
-          <div className="cw-chronicle-box" onClick={e => e.stopPropagation()}>
-            <div className="cw-chronicle-header">
-              {chronicleLoading ? (
-                <>
-                  <div className="cw-chronicle-loading-title">⏳ The Grand Chronicler writes…</div>
-                  <div className="cw-chronicle-loading-sub">Weaving {storyLog.length} verses into one eternal saga</div>
-                </>
-              ) : (
-                <div className="cw-chronicle-title">{chronicleData?.title}</div>
-              )}
-            </div>
-            <div className="cw-chronicle-body">
-              {chronicleLoading
-                ? <div className="cw-chronicle-spinner">✦ &nbsp; Ink flows across the pages of eternity… &nbsp; ✦</div>
-                : chronicleData?.body?.split("\n\n").map((para, i) => (
-                    <p key={i} className="cw-chronicle-para">{para}</p>
-                  ))
-              }
-            </div>
-            <div className="cw-chronicle-footer">
-              <button onClick={() => { setShowChronicle(false); reset(); }} className="cw-chronicle-close">
-                Close & Fight Again
-              </button>
-              {!chronicleLoading && (
-                <>
-                  <button
-                    onClick={() => navigator.clipboard?.writeText(`${chronicleData?.title}\n\n${chronicleData?.body}`).catch(()=>{})}
-                    className="cw-chronicle-copy">
-                    Copy Chronicle
-                  </button>
-                  <button
-                    onClick={() => setShowCard(true)}
-                    className="cw-chronicle-btn"
-                    style={{ fontSize: ".6rem", padding: "9px 18px", letterSpacing: "2px" }}>
-                    🖼 CREATE SHARE CARD
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {showCard && chronicleData && (
-        <ChronicleCard
-          data={{
-            title:      chronicleData.title,
-            winner:     turn === "white" ? "Umbral Conclave" : "Luminar Order",
-            moveCount:  moveNum,
-            captures:   captureCount.current,
-            crossRealm: crossRealmCount.current,
-            checks:     checkCount.current,
-            cpEarned:   stats.cp,
-            moments:    storyLog.slice(0, 5).map(e => e.t),
-          }}
-          onClose={() => setShowCard(false)}
-        />
-      )}
-      {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
-      {showAuth && <AuthModal onLogin={(p) => { setProfile(p); setShowAuth(false); }} onClose={() => setShowAuth(false)} />}
-      {showChallenge && (
-        <AIChallengeScreen
-          difficulty={difficulty} setDifficulty={setDifficulty}
-          onBegin={beginChallenge} onBack={() => setShowChallenge(false)}
-          playerStats={stats}
-        />
-      )}
-      {showQuit && (
-        <QuitConfirmation
-          difficulty={difficulty} mode={mode}
-          onConfirm={handleQuit} onCancel={() => setShowQuit(false)}
-        />
-      )}
-      {outcomeToast && (
-        <OutcomeToast
-          result={outcomeToast.result}
-          cpDelta={outcomeToast.cpDelta}
-          reason={outcomeToast.reason}
-          onDone={() => setOutcomeToast(null)}
-        />
-      )}
-      <RankUpToast rankUpData={rankUpData} onDismiss={() => setRankUpData(null)} />
-    </div>
-  );
+  
+  return null; // Desktop layout placeholder
 }
