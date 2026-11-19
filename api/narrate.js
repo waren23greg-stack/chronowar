@@ -1,6 +1,6 @@
 /* global process */
 // Vercel serverless proxy: keeps the LLM API key server-side.
-const MAX_PROMPT = 8000;
+const MAX_PROMPT = 16000;
 const MAX_TOKENS = 1200;
 
 export default async function handler(req, res) {
