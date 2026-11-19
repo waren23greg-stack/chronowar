@@ -24,7 +24,7 @@ export default async function handler(req, res) {
         messages: [{ role: "user", content: prompt }],
       }),
     });
-    if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: `Upstream ${r.status}` });
+    if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: `Upstream ${r.status}`, detail: (await r.text()).slice(0, 300) });
     const data = await r.json();
     return res.status(200).json({ text: data.choices?.[0]?.message?.content ?? null });
   } catch {
