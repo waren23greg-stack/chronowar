@@ -16,8 +16,8 @@ const SHEET_FULL = 0.88;
 
 export default function MobileLayout({
   boards, sel, moves, lastMove, turn, status, moveNum,
-  aiThinking, aiTaunt, narrating, displayed, storyLog,
-  stats, captured, activeRealm, setActiveRealm,
+  aiThinking, narrating, displayed, storyLog,
+  stats, setActiveRealm,
   handleClick, reset, openChronicle, mode, difficulty,
   setMode, setDifficulty, muted, toggleMute,
   setShowTutorial, setScreen, ensureAudio,
@@ -38,7 +38,6 @@ export default function MobileLayout({
   // ── Dynamic square size — fits width AND leaves room for board
   const vw = typeof window !== "undefined" ? window.innerWidth : 390;
   const sqSize = Math.max(32, Math.min(58, Math.floor((vw - 28) / 6)));
-  const boardPx = sqSize * 6;
 
   useEffect(() => { setActiveRealm(realm); }, [realm, setActiveRealm]);
 
