@@ -427,7 +427,7 @@ export default function LandingPage({ onPlay, onTour }) {
             { C: Knight,     name: "Chronorider" },
             { C: Sage,       name: "The Oracle" },
             { C: PhaseWalker,name: "Phase Walker" },
-          ].map(({ name }, i) => (
+          ].map(({ C, name }, i) => (
             <div key={i} style={{ textAlign:"center" }}>
               <div style={{
                 padding: "14px 14px 10px",
