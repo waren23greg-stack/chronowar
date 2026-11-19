@@ -7,7 +7,7 @@
 
 [![Live Demo](https://img.shields.io/badge/▶_PLAY_NOW-chronowar.vercel.app-c89030?style=for-the-badge)](https://chronowar.vercel.app)
 [![Built with React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev)
-[![Powered by Claude](https://img.shields.io/badge/Narration-Claude_AI-8848c0?style=flat-square)](https://anthropic.com)
+[![AI Narration](https://img.shields.io/badge/Narration-AI-8848c0?style=flat-square)](https://groq.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 </div>
@@ -16,7 +16,7 @@
 
 ## 🌍 What is ChronoWar?
 
-ChronoWar is a **narrative chess variant** played across **three simultaneous 6×6 boards** — the amber *Past*, the emerald *Present*, and the violet *Future*. Every move you make is narrated in real-time by Claude AI as **epic mythic prose**, building a unique war chronicle that is yours alone.
+ChronoWar is a **narrative chess variant** played across **three simultaneous 6×6 boards** — the amber *Past*, the emerald *Present*, and the violet *Future*. Every move you make is narrated in real-time by AI as **epic mythic prose**, building a unique war chronicle that is yours alone.
 
 It is chess. It is a story. It is a living legend.
 
@@ -27,14 +27,14 @@ It is chess. It is a story. It is a living legend.
 | Feature | Description |
 |---|---|
 | 🌍 **Three Realms** | Past, Present & Future boards — all active simultaneously |
-| 📖 **AI Narration** | Every move generates 2–3 verses of epic storytelling via Claude |
+| 📖 **AI Narration** | Every move generates 2–3 verses of epic storytelling via an LLM |
 | 🤖 **AI Opponent** | Minimax + alpha-beta pruning across all three realms. Easy / Medium / Hard |
 | 🗺 **Living Map** | Parchment map background that auto-shifts per active realm (Past/Present/Future) |
 | 🏛 **Landing Page** | Cinematic hero page with feature showcase |
 | 📚 **Tutorial** | 6-step interactive guide with live visual examples |
 | 🏆 **Points & Ranking** | Chronicle Points, ELO rating, 7 rank tiers — persisted in localStorage |
 | 🎻 **Orchestral Score** | Procedural strings (violin/viola/cello/flute/harp) — pure Web Audio API |
-| 📜 **Battle Chronicle** | Post-game Claude writes the entire war as one shareable epic story |
+| 📜 **Battle Chronicle** | Post-game AI writes the entire war as one shareable epic story |
 | 🖼 **Chronicle Card** | Export a beautiful parchment image card (16:9 or 1:1) with QR code — share on X or Instagram |
 | 🎨 **SVG Pieces** | Heraldic hand-drawn chess pieces — clean, high-contrast, no bloom |
 
@@ -130,7 +130,7 @@ Pure **Web Audio API** — no external files, no dependencies.
 git clone https://github.com/waren23greg-stack/chronowar.git
 cd chronowar
 npm install
-echo "VITE_ANTHROPIC_API_KEY=your_key_here" > .env
+# Optional AI narration: set GROQ_API_KEY on the server (Vercel), see api/narrate.js. Without it the game uses built-in text.
 npm run dev
 ```
 
@@ -143,7 +143,7 @@ chronowar/
 ├── src/
 │   ├── engine.js              ← 3-realm chess logic (pure JS, zero deps)
 │   ├── ai.js                  ← Minimax + alpha-beta across 3 boards
-│   ├── narrative.js           ← Claude API narration per move
+│   ├── narrative.js           ← AI narration per move (via /api/narrate)
 │   ├── chronicle.js           ← Post-game full battle chronicle
 │   ├── audio.js               ← Procedural orchestral score
 │   ├── points.jsx             ← Chronicle Points, ELO, ranking
