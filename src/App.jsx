@@ -191,7 +191,6 @@ export default function App() {
   const [kingFlankMoves, setKingFlankMoves]   = useState({ white: 0, black: 0 });
   const [temporalCheckmate, setTemporalCheckmate] = useState(false);
   const [drawReason, setDrawReason]           = useState(null);
-  const [convergenceWarn, setConvergenceWarn] = useState([]);
   const [lastMoveByPiece, setLastMoveByPiece] = useState({});
   const fatigueRef    = useRef({});
   const posHistRef    = useRef([]);
@@ -686,7 +685,7 @@ export default function App() {
     setCrossCount({ white: 0, black: 0 }); setDrawReason(null);
     setKingFlankMoves({ white: 0, black: 0 }); kingFlankRef.current = { white: 0, black: 0 };
     setTemporalCheckmate(false);
-    setConvergenceWarn([]); setLastMoveByPiece({});
+    setLastMoveByPiece({});
     updateMusicFromGame(0, "playing", 0);
     setNarr("A new war begins. The armies assume their eternal positions once more — let the chronicles be written anew…");
     setNarrating(false); setAiThinking(false); setAiTaunt("");
