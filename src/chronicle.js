@@ -3,7 +3,6 @@
 //  Every game produces a unique epic narrative
 // ============================================================
 
-const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
 // ── Varied fallback engine (for when API is unavailable) ──
 const OPENING_ARCHETYPES = [
@@ -132,24 +131,15 @@ TITLE: [title here]
 [full chronicle body — paragraphs separated by blank lines]`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("/api/narrate", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": API_KEY,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1400,
-        messages: [{ role: "user", content: prompt }],
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, maxTokens: 1200 }),
     });
 
     if (!res.ok) throw new Error(`API ${res.status}`);
     const data = await res.json();
-    const text = (data.content?.[0]?.text || "").trim();
+    const text = (data.text || "").trim();
     const titleMatch = text.match(/TITLE:\s*(.+)/);
     const title = titleMatch ? titleMatch[1].trim() : null;
     const body = text.replace(/TITLE:\s*.+\n?/, "").trim();
