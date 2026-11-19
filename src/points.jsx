@@ -569,8 +569,8 @@ export function PostGameReport({ reportData, lastNarr, onNewGame, onChronicle })
   if (!reportData) return null;
   const {
     result, difficulty, moveCount,
-    prevElo, newElo, eloDelta,
-    cpGained, rankBefore, rankAfter, promoted,
+    newElo, eloDelta,
+    cpGained, rankAfter, promoted,
     captures, crossRealm, checks,
     temporalCheckmate = false,
   } = reportData;

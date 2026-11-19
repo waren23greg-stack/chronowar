@@ -4,7 +4,6 @@
 // ============================================================
 
 export default function ChronowarLogo({ size = 200, showText = true, animate = true }) {
-  const s = size / 200; // scale factor
   const id = `cw-logo-${Math.random().toString(36).slice(2, 7)}`;
 
   return (

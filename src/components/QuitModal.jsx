@@ -7,7 +7,6 @@ import { QUIT_PENALTY } from "./AIChallengeScreen";
 // ── Quit confirmation dialog ──────────────────────────────
 export function QuitConfirmation({ difficulty, mode, onConfirm, onCancel }) {
   const penalty = mode === "vs-ai" ? (QUIT_PENALTY[difficulty] || -15) : 0;
-  const [countdown, setCountdown] = useState(null);
 
   return (
     <div style={{

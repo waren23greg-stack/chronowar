@@ -96,7 +96,7 @@ const STEPS = [
             [Pawn,    "W","Pawn"],
             [Sage,    "W","Oracle"],
             [PhaseWalker,"W","Phase Walker"],
-          ].map(([C,w,name]) => (
+          ].map(([,w,name]) => (
             <div key={name} style={{ textAlign:"center" }}>
               <C size={36} isWhite={w==="W"} />
               <div style={{ fontFamily:"'Cinzel',serif", fontSize:".36rem", color:"rgba(80,55,20,.5)", letterSpacing:"1px", marginTop:3 }}>{name.toUpperCase()}</div>

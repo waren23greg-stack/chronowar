@@ -2,7 +2,7 @@
 //  CHRONOWAR — User Account System
 //  localStorage-based profiles, no backend required
 // ============================================================
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { getRank, getNextRank, getProgressToNext } from "./points.jsx";
 
 const ACCOUNTS_KEY = "cw_accounts_v1";

@@ -2,7 +2,7 @@
 //  CHRONOWAR — Advanced Game Rules v3
 //  Infinite loop prevention + genius anti-draw mechanics
 // ============================================================
-import { REALMS, BS, pt, isW } from "./engine";
+import { REALMS, BS, pt } from "./engine";
 
 // ── Position hashing (all 3 realms) ──
 export function hashBoards(boards) {

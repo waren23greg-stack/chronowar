@@ -11,7 +11,7 @@ const OPENING_ARCHETYPES = [
   (w, l) => `The seers spoke of it in whispers across three realms: a war that would not merely decide kingdoms, but rewrite the architecture of time itself. The ${w} heard the prophecy first. The ${l} refused to believe it.`,
   (w, l) => `When the Temporal Convergence aligned all three realms under a single sky, the ${w} and the ${l} met not as enemies, but as forces of nature — inevitable, ancient, and absolute.`,
   (w, l) => `There are wars written in stone, and wars written in fire. This war was written in light and shadow both — the ${w} bearing the radiance of a thousand suns, the ${l} carrying the cold weight of an eternal night.`,
-  (w, l) => `The chronicles say the boards trembled when both armies assumed their positions. Across Past, Present, and Future, something fundamental shifted — as though the universe itself understood that what followed would leave a permanent mark.`,
+  () => `The chronicles say the boards trembled when both armies assumed their positions. Across Past, Present, and Future, something fundamental shifted — as though the universe itself understood that what followed would leave a permanent mark.`,
 ];
 
 const TURNING_POINT_ARCHETYPES = [
