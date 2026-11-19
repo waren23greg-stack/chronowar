@@ -96,7 +96,7 @@ function evaluateBoard(boards, isWhiteToMove, kingBudget = null, currentTurnEntr
   const perspectiveMultiplier = isWhiteToMove ? 1 : -1;
 
   // Final Blend: 40% Physical Chess, 60% Temporal Manipulation
-  return (classicScore * 0.4) + (temporalScore * perspectiveMultiplier * 0.6);
+  return classicScore + temporalScore * perspectiveMultiplier * 0.02;
 }
 
 function getAllMoves(boards, white, kingBudget = null) {
