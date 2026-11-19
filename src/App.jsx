@@ -32,7 +32,7 @@ import { AuthModal, ProfileBar, getSession, getProfile, updateAccountStats, clea
 import {
   PointsHUD, RankUpToast, PostGameReport,
   detectRankUp, getRank, POINTS,
-  loadStats, awardGameEnd, awardMoveEvent,
+  loadStats, saveStats, awardGameEnd, awardMoveEvent,
 } from "./points.jsx";
 import "./App.css";
 import ChronowarLogo from "./components/ChronowarLogo";
