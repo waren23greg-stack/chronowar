@@ -3,7 +3,7 @@
 //  Minimax with alpha-beta pruning across all 3 realms
 //  Upgraded with Temporal Entropy & AI Personality Profiles
 // ============================================================
-import { REALMS, BS, isW, pt, legalMoves, applyMove, inCheck, KING_FLANK_BUDGET } from "./engine";
+import { REALMS, BS, isW, pt, legalMoves, rawMoves, applyMove, inCheck, KING_FLANK_BUDGET } from "./engine";
 import { AI_PROFILES } from "./evaluateEntropy";
 import TemporalEngine from "./temporalEngine";
 
@@ -58,7 +58,7 @@ function calculateClassicScore(boards, kingBudget = null) {
       for (let c = 0; c < BS; c++) {
         const p = boards[realm][r][c];
         if (!p) continue;
-        const moves = legalMoves(boards, realm, r, c, kingBudget).length;
+        const moves = rawMoves(boards, realm, r, c).length;
         if (isW(p)) wMob += moves; else bMob += moves;
       }
   score += (wMob - bMob) * 5;
