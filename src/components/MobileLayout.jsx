@@ -37,7 +37,7 @@ export default function MobileLayout({
 
   // ── Dynamic square size — fits width AND leaves room for board
   const vw = typeof window !== "undefined" ? window.innerWidth : 390;
-  const sqSize = Math.min(58, Math.floor((vw - 28) / 6));
+  const sqSize = Math.max(32, Math.min(58, Math.floor((vw - 28) / 6)));
   const boardPx = sqSize * 6;
 
   useEffect(() => { setActiveRealm(realm); }, [realm, setActiveRealm]);
