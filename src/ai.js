@@ -128,12 +128,12 @@ function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null, aiPr
   const moves = getAllMoves(boards, white, kingBudget);
   
   if (moves.length === 0) {
-    if (inCheck(boards, white)) return { score: maximizing ? -50000 + depth : 50000 - depth };
+    if (inCheck(boards, white)) return { score: maximizing ? -50000 - depth : 50000 + depth };
     // Temporal checkmate — budget exhausted, no moves → loss
     if (kingBudget) {
       const side = white ? "white" : "black";
       if ((kingBudget[side] ?? KING_FLANK_BUDGET) <= 0)
-        return { score: maximizing ? -50000 + depth : 50000 - depth };
+        return { score: maximizing ? -50000 - depth : 50000 + depth };
     }
     return { score: 0 }; // stalemate
   }
