@@ -287,12 +287,12 @@ export function awardGameEnd(stats, { result, difficulty, moveCount, mode, gameS
   } else if (result === "draw") {
     s.draws += 1;
     s.streak = 0;
-    cpGained += POINTS.draw;
+    cpGained += POINTS[mode === "vs-ai" ? `draw_${difficulty}` : "draw_2player"] ?? 0;
     if (mode === "vs-ai") s.elo = eloRes.newElo;
   } else {
     s.losses += 1;
     s.streak = 0;
-    cpGained += POINTS.loss;
+    cpGained += POINTS[mode === "vs-ai" ? `loss_${difficulty}` : "loss_2player"] ?? 0;
     if (s.lossesPerDiff[difficulty] !== undefined) s.lossesPerDiff[difficulty]++;
     if (mode === "vs-ai") s.elo = eloRes.newElo;
   }
@@ -760,9 +760,9 @@ function CPBreakdown({ result, difficulty, moveCount, captures, crossRealm, chec
     items.push([`🏆 Victory (${difficulty})`, 1, POINTS[winKey]||POINTS.win_medium]);
     if (moveCount <= 15) items.push(["⚡ Swift Victory", 1, POINTS.fast_win]);
   } else if (result === "draw") {
-    items.push(["🤝 Stalemate", 1, POINTS.draw]);
+    items.push(["🤝 Stalemate", 1, POINTS[`draw_${difficulty}`] ?? 0]);
   } else {
-    items.push(["📜 Participation", 1, POINTS.loss]);
+    items.push(["📜 Participation", 1, POINTS[`loss_${difficulty}`] ?? 0]);
   }
   return (
     <div>
