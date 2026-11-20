@@ -256,7 +256,7 @@ function classifyAccuracy(pct) {
 }
 
 // ── Award game end ─────────────────────────────────────────────
-export function awardGameEnd(stats, { result, difficulty, moveCount, mode, gameStats = {} }) {
+export function awardGameEnd(stats, { result, difficulty, moveCount, mode, stanceBonus = 1, gameStats = {} }) {
   const s = {
     ...defaultStats(), ...stats,
     winsPerDiff:   { easy:0,medium:0,hard:0, ...(stats.winsPerDiff   || {}) },
@@ -283,6 +283,7 @@ export function awardGameEnd(stats, { result, difficulty, moveCount, mode, gameS
     if (!s.fastestWin || moveCount < s.fastestWin) s.fastestWin = moveCount;
     if (s.streak > 0 && s.streak % 3 === 0) cpGained += POINTS.streak_bonus;
     if (mode === "vs-ai") { s.elo = eloRes.newElo; }
+    cpGained = Math.round(cpGained * stanceBonus);
   } else if (result === "draw") {
     s.draws += 1;
     s.streak = 0;
