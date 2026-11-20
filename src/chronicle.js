@@ -141,7 +141,7 @@ TITLE: [title here]
     const data = await res.json();
     const text = (data.text || "").trim();
     const titleMatch = text.match(/TITLE:\s*(.+)/);
-    const title = titleMatch ? titleMatch[1].trim() : null;
+    const title = titleMatch ? titleMatch[1].replace(/\*+/g, "").trim() : null;
     const body = text.replace(/TITLE:\s*.+\n?/, "").trim();
 
     if (!title || !body || body.length < 100) throw new Error("Incomplete response");
