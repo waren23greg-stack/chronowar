@@ -26,6 +26,7 @@ import LandingPage from "./components/LandingPage";
 import Tutorial from "./components/Tutorial";
 import ChronicleCard from "./components/ChronicleCard";
 import MobileLayout from "./components/MobileLayout";
+import { QuitConfirmation, OutcomeToast } from "./components/QuitModal";
 import ProTour, { TOUR_CHALLENGES } from "./components/ProTour";
 import AIChallengeScreen, { AI_PERSONAS, QUIT_PENALTY } from "./components/AIChallengeScreen";
 import { AuthModal, ProfileBar, getSession, getProfile, updateAccountStats, clearSession } from "./accounts.jsx";
