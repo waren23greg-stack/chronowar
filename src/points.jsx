@@ -22,7 +22,7 @@ export const RANK_TIERS = [
 export function loadStats() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...defaultStats(), ...JSON.parse(raw) };
+    if (raw) return sanitizeStats({ ...defaultStats(), ...JSON.parse(raw) });
   } catch {}
   return defaultStats();
 }
@@ -775,4 +775,12 @@ function CPBreakdown({ result, difficulty, moveCount, captures, crossRealm, chec
       ))}
     </div>
   );
+}
+
+// Repair numeric fields that earlier bugs saved as null/NaN.
+function sanitizeStats(s) {
+  const d = defaultStats();
+  for (const k of Object.keys(d))
+    if (typeof d[k] === "number" && !Number.isFinite(s[k])) s[k] = d[k];
+  return s;
 }
