@@ -569,7 +569,8 @@ export default function App() {
     const timer = setTimeout(() => {
       const b = boardsRef.current;
       const _kb = { white: KING_FLANK_BUDGET - kingFlankRef.current.white, black: KING_FLANK_BUDGET - kingFlankRef.current.black };
-      const m = difficultyRef.current === "easy" ? getEasyMove(b, _kb) : getBestMove(b, difficultyRef.current, _kb);
+      const _vc = new Map(); for (const h of posHistRef.current) _vc.set(h, (_vc.get(h) || 0) + 1);
+      const m = difficultyRef.current === "easy" ? getEasyMove(b, _kb) : getBestMove(b, difficultyRef.current, _kb, undefined, null, _vc);
       setAiThinking(false);
       setAiTaunt("");
       if (!m) return;
