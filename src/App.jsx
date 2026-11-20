@@ -323,7 +323,7 @@ export default function App() {
     if (!narr) { setDisplayed(""); return; }
     let i = 0; setDisplayed("");
     twTimer.current = setInterval(() => {
-      if (i < narr.length) { setDisplayed(s => s + narr[i]); i++; }
+      if (i < narr.length) { i++; setDisplayed(narr.slice(0, i)); }
       else clearInterval(twTimer.current);
     }, 16);
     return () => clearInterval(twTimer.current);
