@@ -354,3 +354,6 @@ html, body, #root { height: 100%; }
   .cw-title { font-size: 1.75rem; letter-spacing: 5px; }
   .cw-stat { font-size: 11px; }
 }
+
+/* Keep the captured row from widening the centre column past the board */
+.cw-captured { width: 0; min-width: 100%; box-sizing: border-box; }
