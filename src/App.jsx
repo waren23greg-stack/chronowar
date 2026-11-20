@@ -550,7 +550,7 @@ export default function App() {
     if (gained > 0) { setStats(awardedStats); awardFlash(gained); }
 
     return { nb, newTurn, num, newStatus };
-  }, [doNarration]);
+  }, [doNarration, stance, mode]);
 
   // ── AI move trigger ──
   useEffect(() => {
