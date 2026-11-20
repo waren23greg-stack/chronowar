@@ -6,6 +6,7 @@
 import { REALMS, BS, isW, pt, legalMoves, rawMoves, applyMove, inCheck, KING_FLANK_BUDGET } from "./engine";
 import { AI_PROFILES } from "./evaluateEntropy";
 import TemporalEngine from "./temporalEngine";
+import { hashBoards } from "./gameRules";
 
 // Initialize a standalone temporal engine specifically for AI tree simulations
 const aiTemporalEngine = new TemporalEngine();
@@ -99,6 +100,13 @@ function evaluateBoard(boards, isWhiteToMove, kingBudget = null, currentTurnEntr
   return classicScore + temporalScore * perspectiveMultiplier * 0.02;
 }
 
+// A move that creates a 3rd occurrence of an already-seen position is a draw.
+function isRepeat(nb, whiteJustMoved, visitCounts) {
+  if (!visitCounts) return false;
+  const key = hashBoards(nb) + ":" + (whiteJustMoved ? "b" : "w");
+  return (visitCounts.get(key) || 0) >= 2;
+}
+
 function getAllMoves(boards, white, kingBudget = null) {
   const moves = [];
   for (const realm of REALMS)
@@ -121,7 +129,7 @@ function orderMoves(boards, moves) {
 }
 
 // UPDATED: Now receives AI profile and entropy, passing them down the tree
-function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null, aiProfileName = 'THE_TIME_WEAVER', currentEntropy = null) {
+function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null, aiProfileName = 'THE_TIME_WEAVER', currentEntropy = null, visitCounts = null) {
   if (depth === 0) return { score: evaluateBoard(boards, maximizing, kingBudget, currentEntropy, aiProfileName) };
   
   const white = maximizing;
@@ -146,7 +154,7 @@ function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null, aiPr
     for (const m of ordered) {
       const nb = applyMove(boards, m.fromRealm, m.fromRow, m.fromCol, m.realm, m.row, m.col);
       const nextBudget = spendKingBudget(kingBudget, boards[m.fromRealm][m.fromRow][m.fromCol], m.fromRealm);
-      const { score } = minimax(nb, depth - 1, alpha, beta, false, nextBudget, aiProfileName, currentEntropy);
+      const { score } = isRepeat(nb, white, visitCounts) ? { score: 0 } : minimax(nb, depth - 1, alpha, beta, false, nextBudget, aiProfileName, currentEntropy, visitCounts);
       if (score > maxScore) { maxScore = score; best = m; }
       alpha = Math.max(alpha, score);
       if (beta <= alpha) break;
@@ -157,7 +165,7 @@ function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null, aiPr
     for (const m of ordered) {
       const nb = applyMove(boards, m.fromRealm, m.fromRow, m.fromCol, m.realm, m.row, m.col);
       const nextBudget = spendKingBudget(kingBudget, boards[m.fromRealm][m.fromRow][m.fromCol], m.fromRealm);
-      const { score } = minimax(nb, depth - 1, alpha, beta, true, nextBudget, aiProfileName, currentEntropy);
+      const { score } = isRepeat(nb, white, visitCounts) ? { score: 0 } : minimax(nb, depth - 1, alpha, beta, true, nextBudget, aiProfileName, currentEntropy, visitCounts);
       if (score < minScore) { minScore = score; best = m; }
       beta = Math.min(beta, score);
       if (beta <= alpha) break;
@@ -169,8 +177,8 @@ function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null, aiPr
 const DEPTH = { easy:1, medium:2, hard:3 };
 
 // UPDATED: Entry points now accept the current temporal state and AI personality
-export function getBestMove(boards, difficulty = "medium", kingBudget = null, aiProfileName = 'THE_BLOOD_MONARCH', currentEntropy = null) {
-  const result = minimax(boards, DEPTH[difficulty] || 2, -Infinity, Infinity, false, kingBudget, aiProfileName, currentEntropy);
+export function getBestMove(boards, difficulty = "medium", kingBudget = null, aiProfileName = 'THE_BLOOD_MONARCH', currentEntropy = null, visitCounts = null) {
+  const result = minimax(boards, DEPTH[difficulty] || 2, -Infinity, Infinity, false, kingBudget, aiProfileName, currentEntropy, visitCounts);
   return result.move || null;
 }
 
