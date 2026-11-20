@@ -282,7 +282,6 @@ export function awardGameEnd(stats, { result, difficulty, moveCount, mode, gameS
     if (moveCount > s.longestGame) s.longestGame = moveCount;
     if (!s.fastestWin || moveCount < s.fastestWin) s.fastestWin = moveCount;
     if (s.streak > 0 && s.streak % 3 === 0) cpGained += POINTS.streak_bonus;
-    if ((gameStats.blunders || 0) === 0 && moveCount > 4) cpGained += POINTS.brilliant_game;
     if (mode === "vs-ai") { s.elo = eloRes.newElo; }
   } else if (result === "draw") {
     s.draws += 1;
