@@ -298,6 +298,7 @@ export default function App() {
   const [gameReport, setGameReport] = useState(null);
   const statsRef = useRef(stats);
   useEffect(() => { statsRef.current = stats; }, [stats]);
+  const gameStartCp = useRef(stats.cp);
   const awardFlash = (pts) => { setLastAward(pts); setTimeout(() => setLastAward(null), 1600); };
 
   // ── Refs to avoid stale closures ──
@@ -510,7 +511,7 @@ export default function App() {
         prevElo:   _ws.elo,
         newElo:    endStats.elo,
         eloDelta:  endStats.elo - _ws.elo,
-        cpGained:  Math.max(0, endGain),
+        cpGained:  Math.max(0, endStats.cp - gameStartCp.current),
         cpLost:    Math.min(0, endGain),
         rankBefore: getRank(_ws.cp),
         rankAfter:  getRank(endStats.cp),
@@ -692,6 +693,7 @@ export default function App() {
     setNarrating(false); setAiThinking(false); setAiTaunt("");
     setShowOver(false); setShowChronicle(false); setChronicleData(null);
     setGameReport(null); setRankUpData(null);
+    gameStartCp.current = statsRef.current.cp;
     globalTimeline.snapshots = []; // Clear history ledger on reset
   };
 
