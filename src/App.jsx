@@ -470,7 +470,7 @@ export default function App() {
       setTimeout(() => setShowOver(true), 1800);
       // Determine result
       const result = newStatus === "draw" || newStatus === "stalemate" ? "draw"
-                   : (isW(movePiece) ? "white" : "black") === currentTurn ? "win" : "loss";
+                   : mode === "vs-ai" ? ((isW(movePiece) ? "white" : "black") === (stance === "defend" ? "black" : "white") ? "win" : "loss") : "win";
 
       // Stance modifier — defending (playing Black) earns bonus
       const isDefending = stance === "defend" && mode === "vs-ai";
