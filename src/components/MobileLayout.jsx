@@ -20,7 +20,7 @@ export default function MobileLayout({
   stats, setActiveRealm,
   handleClick, reset, openChronicle, mode, difficulty,
   setMode, setDifficulty, muted, toggleMute,
-  setShowTutorial, setScreen, ensureAudio, checkPos,
+  setShowTutorial, setScreen, ensureAudio, setShowChallenge, checkPos,
 }) {
   const [realmIdx, setRealmIdx] = useState(1);
   const [sheetH,   setSheetH]   = useState(SHEET_PEEK);
@@ -242,6 +242,7 @@ export default function MobileLayout({
           {/* Divider */}
           <div style={{ height:1, background:"rgba(120,85,25,.18)", margin:"2px 0" }}/>
           {/* Actions */}
+          {mode === "vs-ai" && menuBtn("🛡  AI CHALLENGE", () => { setShowChallenge(true); setShowMenu(false); }, true)}
           {menuBtn("⚔  PRO TOUR",    () => { setScreen("tour"); setShowMenu(false); })}
           {menuBtn("?  HOW TO PLAY", () => { setShowTutorial(true); setShowMenu(false); })}
           {menuBtn(muted ? "🔊  UNMUTE" : "🔇  MUTE", handleMute)}

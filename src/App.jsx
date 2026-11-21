@@ -761,7 +761,7 @@ export default function App() {
           setMode={setMode} setDifficulty={setDifficulty}
           muted={muted} toggleMute={toggleMute}
           ensureAudio={ensureAudio}
-          setShowTutorial={setShowTutorial} setScreen={setScreen} checkPos={checkPos}
+          setShowTutorial={setShowTutorial} setScreen={setScreen} setShowChallenge={setShowChallenge} checkPos={checkPos}
         />
         {showOver && (
           <PostGameReport
@@ -804,6 +804,13 @@ export default function App() {
           />
         )}
         {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+        {showChallenge && (
+          <AIChallengeScreen
+            difficulty={difficulty} setDifficulty={setDifficulty}
+            onBegin={beginChallenge} onBack={() => setShowChallenge(false)}
+            playerStats={stats}
+          />
+        )}
         
         {/* Timeline Rewrite Panel Overlay */}
         <HistoryRewritePanel 
