@@ -313,6 +313,8 @@ export default function App() {
   useEffect(() => { turnRef.current = turn; }, [turn]);
   useEffect(() => { statusRef.current = status; }, [status]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
+  const stanceRef = useRef(stance);
+  useEffect(() => { stanceRef.current = stance; }, [stance]);
   useEffect(() => { difficultyRef.current = difficulty; }, [difficulty]);
   useEffect(() => { moveNumRef.current = moveNum; }, [moveNum]);
   useEffect(() => { storyLogRef.current = storyLog; }, [storyLog]);
@@ -555,7 +557,8 @@ export default function App() {
   // ── AI move trigger ──
   useEffect(() => {
     if (modeRef.current !== "vs-ai") return;
-    if (turnRef.current !== "black") return;
+    const _aiSide = stanceRef.current === "defend" ? "white" : "black";
+    if (turnRef.current !== _aiSide) return;
     if (statusRef.current !== "playing" && statusRef.current !== "check") return;
 
     const persona = AI_PERSONAS[difficultyRef.current] || AI_PERSONAS.medium;
@@ -570,16 +573,16 @@ export default function App() {
       const b = boardsRef.current;
       const _kb = { white: KING_FLANK_BUDGET - kingFlankRef.current.white, black: KING_FLANK_BUDGET - kingFlankRef.current.black };
       const _vc = new Map(); for (const h of posHistRef.current) _vc.set(h, (_vc.get(h) || 0) + 1);
-      const m = difficultyRef.current === "easy" ? getEasyMove(b, _kb) : getBestMove(b, difficultyRef.current, _kb, undefined, null, _vc);
+      const m = difficultyRef.current === "easy" ? getEasyMove(b, _kb, undefined, null, _aiSide === "white") : getBestMove(b, difficultyRef.current, _kb, undefined, null, _vc, _aiSide === "white");
       setAiThinking(false);
       setAiTaunt("");
       if (!m) return;
       const movePiece = b[m.fromRealm][m.fromRow][m.fromCol];
-      commitMove(b, movePiece, m.fromRealm, m.fromRow, m.fromCol, m.realm, m.row, m.col, "black", moveNumRef.current);
+      commitMove(b, movePiece, m.fromRealm, m.fromRow, m.fromCol, m.realm, m.row, m.col, _aiSide, moveNumRef.current);
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [turn, status, mode]); // eslint-disable-line
+  }, [turn, status, mode, stance]); // eslint-disable-line
 
   // ── Human click ──
   const handleClick = (realm, row, col) => {
