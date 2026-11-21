@@ -131,7 +131,6 @@ export default function MobileLayout({
         padding: "10px 14px 8px",
         borderBottom: "1px solid rgba(100,70,20,.2)",
         background: "rgba(255,255,255,.05)",
-        backdropFilter: "blur(6px)",
         zIndex: 10,
         gap: 10,
       }}>
