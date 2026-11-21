@@ -177,15 +177,15 @@ function minimax(boards, depth, alpha, beta, maximizing, kingBudget = null, aiPr
 const DEPTH = { easy:1, medium:2, hard:3 };
 
 // UPDATED: Entry points now accept the current temporal state and AI personality
-export function getBestMove(boards, difficulty = "medium", kingBudget = null, aiProfileName = 'THE_BLOOD_MONARCH', currentEntropy = null, visitCounts = null) {
-  const result = minimax(boards, DEPTH[difficulty] || 2, -Infinity, Infinity, false, kingBudget, aiProfileName, currentEntropy, visitCounts);
+export function getBestMove(boards, difficulty = "medium", kingBudget = null, aiProfileName = 'THE_BLOOD_MONARCH', currentEntropy = null, visitCounts = null, aiWhite = false) {
+  const result = minimax(boards, DEPTH[difficulty] || 2, -Infinity, Infinity, aiWhite, kingBudget, aiProfileName, currentEntropy, visitCounts);
   return result.move || null;
 }
 
-export function getEasyMove(boards, kingBudget = null, aiProfileName = 'THE_TIME_WEAVER', currentEntropy = null) {
-  const moves = getAllMoves(boards, false, kingBudget);
+export function getEasyMove(boards, kingBudget = null, aiProfileName = 'THE_TIME_WEAVER', currentEntropy = null, aiWhite = false) {
+  const moves = getAllMoves(boards, aiWhite, kingBudget);
   if (!moves.length) return null;
   if (Math.random() < 0.4) return moves[Math.floor(Math.random() * moves.length)];
-  const result = minimax(boards, 1, -Infinity, Infinity, false, kingBudget, aiProfileName, currentEntropy);
+  const result = minimax(boards, 1, -Infinity, Infinity, aiWhite, kingBudget, aiProfileName, currentEntropy);
   return result.move || moves[0];
 }
