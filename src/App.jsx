@@ -702,6 +702,15 @@ export default function App() {
   };
 
   const wTurn = turn === "white";
+  // Square of the King that is currently in check (for the red pulse)
+  let checkPos = null;
+  if (status === "check" || (status === "checkmate" && !temporalCheckmate)) {
+    const kingId = wTurn ? "W_K" : "B_K";
+    for (const r of ["past", "present", "future"])
+      for (let i = 0; i < 6; i++)
+        for (let j = 0; j < 6; j++)
+          if (boards[r][i][j] === kingId) checkPos = { realm: r, row: i, col: j };
+  }
   const wBudgetLeft = KING_FLANK_BUDGET - kingFlankMoves.white;
   const bBudgetLeft = KING_FLANK_BUDGET - kingFlankMoves.black;
   const currentBudgetLeft = wTurn ? wBudgetLeft : bBudgetLeft;
@@ -752,7 +761,7 @@ export default function App() {
           setMode={setMode} setDifficulty={setDifficulty}
           muted={muted} toggleMute={toggleMute}
           ensureAudio={ensureAudio}
-          setShowTutorial={setShowTutorial} setScreen={setScreen}
+          setShowTutorial={setShowTutorial} setScreen={setScreen} checkPos={checkPos}
         />
         {showOver && (
           <PostGameReport
@@ -901,13 +910,13 @@ export default function App() {
         {/* ── Boards ── */}
         <main className="cw-main">
           <div className="cw-side-boards">
-            <RealmBoard realm="past" cfg={REALM_CFG.past} board={boards.past} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} sqSize={28} />
+            <RealmBoard realm="past" cfg={REALM_CFG.past} board={boards.past} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} checkPos={checkPos} sqSize={28} />
             <div className="cw-portal-label">— TIME PORTAL —</div>
-            <RealmBoard realm="future" cfg={REALM_CFG.future} board={boards.future} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} sqSize={28} />
+            <RealmBoard realm="future" cfg={REALM_CFG.future} board={boards.future} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} checkPos={checkPos} sqSize={28} />
           </div>
 
           <div className="cw-center">
-            <RealmBoard realm="present" cfg={REALM_CFG.present} board={boards.present} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} sqSize={46} />
+            <RealmBoard realm="present" cfg={REALM_CFG.present} board={boards.present} sel={sel} moves={moves} lastMove={lastMove} onClick={handleClick} checkPos={checkPos} sqSize={46} />
             <div className="cw-captured">
               <div className="cw-captured-side cw-captured-w">{captured.white.length ? captured.white.map(p=>SYMBOLS[p]).join("") : "—"}</div>
               <div className="cw-captured-label">captured</div>

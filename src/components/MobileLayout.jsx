@@ -20,7 +20,7 @@ export default function MobileLayout({
   stats, setActiveRealm,
   handleClick, reset, openChronicle, mode, difficulty,
   setMode, setDifficulty, muted, toggleMute,
-  setShowTutorial, setScreen, ensureAudio,
+  setShowTutorial, setScreen, ensureAudio, checkPos,
 }) {
   const [realmIdx, setRealmIdx] = useState(1);
   const [sheetH,   setSheetH]   = useState(SHEET_PEEK);
@@ -329,6 +329,7 @@ export default function MobileLayout({
           lastMove={lastMove}
           onClick={handleClick}
           sqSize={sqSize}
+          checkPos={checkPos}
         />
 
         {/* Swipe dots */}
