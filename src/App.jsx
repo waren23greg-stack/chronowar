@@ -587,7 +587,7 @@ export default function App() {
     setActiveRealm(realm);
     if (!audioReady && moveNum === 0) { bootAudio(); setAudioReady(true); sfxGameStart(); }
     if (status === "checkmate" || status === "stalemate" || status === "draw") return;
-    if (mode === "vs-ai" && turn === "black") return;
+    if (mode === "vs-ai" && turn === (stance === "defend" ? "white" : "black")) return;
     const piece = boards[realm][row][col];
 
     if (sel) {
