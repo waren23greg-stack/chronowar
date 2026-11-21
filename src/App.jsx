@@ -812,6 +812,16 @@ export default function App() {
           />
         )}
         
+        {outcomeToast && (
+          <OutcomeToast
+            result={outcomeToast.result}
+            cpDelta={outcomeToast.cpDelta}
+            reason={outcomeToast.reason}
+            onDone={() => setOutcomeToast(null)}
+          />
+        )}
+        <RankUpToast rankUpData={rankUpData} onDismiss={() => setRankUpData(null)} />
+
         {/* Timeline Rewrite Panel Overlay */}
         <HistoryRewritePanel 
           isOpen={isRewritePanelOpen}
