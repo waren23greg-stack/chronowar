@@ -731,7 +731,7 @@ export default function App() {
         {status === "playing" && (
            <button 
              onClick={() => setIsRewritePanelOpen(true)}
-             className="absolute top-4 left-4 bg-purple-900/50 border border-purple-500 text-purple-200 px-3 py-1 rounded text-xs z-40"
+             className="cw-shatter-btn"
            >
              Shatter Timeline
            </button>

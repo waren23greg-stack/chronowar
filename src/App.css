@@ -357,3 +357,15 @@ html, body, #root { height: 100%; }
 
 /* Keep the captured row from widening the centre column past the board */
 .cw-captured { width: 0; min-width: 100%; box-sizing: border-box; }
+
+/* Floating "Shatter Timeline" pill (mobile) */
+.cw-shatter-btn {
+  position: fixed; right: 12px; bottom: 84px; z-index: 30;
+  padding: 8px 14px;
+  font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: #e9d8ff; background: rgba(48, 20, 96, .88);
+  border: 1px solid rgba(168, 120, 255, .65); border-radius: 999px;
+  box-shadow: 0 0 14px rgba(140, 80, 240, .45), 0 4px 14px rgba(0, 0, 0, .35);
+  cursor: pointer; transition: transform .15s ease, box-shadow .15s ease;
+}
+.cw-shatter-btn:active { transform: scale(.96); }
