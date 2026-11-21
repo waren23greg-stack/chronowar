@@ -740,7 +740,7 @@ export default function App() {
     return (
       <div className="cw-root" data-realm={activeRealm}>
         {/* Quick floating access to shatter timeline during testing */}
-        {status === "playing" && (
+        {status === "playing" && !isRewritePanelOpen && (
            <button 
              onClick={() => setIsRewritePanelOpen(true)}
              className="cw-shatter-btn"
