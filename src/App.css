@@ -369,3 +369,6 @@ html, body, #root { height: 100%; }
   cursor: pointer; transition: transform .15s ease, box-shadow .15s ease;
 }
 .cw-shatter-btn:active { transform: scale(.96); }
+
+/* King-in-check pulse */
+@keyframes cwCheckPulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }

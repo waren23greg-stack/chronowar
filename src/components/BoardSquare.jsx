@@ -4,7 +4,7 @@
 import { PIECE_COMPONENTS } from "../pieces";
 
 export default function BoardSquare({
-  piece, isLight, isSel, move, isLastFrom, isLastTo, cfg, sqSize, onClick,
+  piece, isLight, isSel, move, isLastFrom, isLastTo, isCheck, cfg, sqSize, onClick,
 }) {
   const isCapture = move && !!piece;
   const isValid   = !!move;
@@ -33,6 +33,16 @@ export default function BoardSquare({
       onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.18)"}
       onMouseLeave={e => e.currentTarget.style.filter = "none"}
     >
+      {/* King in check */}
+      {isCheck && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none",
+          background: "radial-gradient(circle, rgba(255,60,40,.55) 0%, rgba(255,60,40,0) 70%)",
+          boxShadow: "inset 0 0 0 2px rgba(220,40,30,.9)",
+          animation: "cwCheckPulse 1s ease-in-out infinite",
+        }} />
+      )}
+
       {/* Selected border */}
       {isSel && (
         <div style={{

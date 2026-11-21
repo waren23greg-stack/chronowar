@@ -59,7 +59,7 @@ function MapPattern({ realm, id }) {
   );
 }
 
-export default function RealmBoard({ realm, cfg, board, sel, moves, lastMove, onClick, sqSize }) {
+export default function RealmBoard({ realm, cfg, board, sel, moves, lastMove, onClick, sqSize, checkPos }) {
   const isPresent = realm === "present";
   const patId = `map-${realm}`;
   const boardPx = sqSize * 6;
@@ -137,6 +137,7 @@ export default function RealmBoard({ realm, cfg, board, sel, moves, lastMove, on
                   isLastTo={isLastTo}
                   cfg={cfg}
                   sqSize={sqSize}
+                  isCheck={checkPos?.realm === realm && checkPos?.row === row && checkPos?.col === col}
                   onClick={() => onClick(realm, row, col)}
                 />
               );
