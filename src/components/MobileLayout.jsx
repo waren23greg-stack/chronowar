@@ -146,7 +146,7 @@ export default function MobileLayout({
           }}>CHRONOWAR</div>
           <div style={{
             fontFamily: "'Cinzel', serif", fontSize: 9,
-            letterSpacing: 3, color: "rgba(100,70,20,.45)",
+            letterSpacing: 3, color: "rgba(80,55,15,.8)",
           }}>THREE REALMS</div>
         </div>
 
@@ -213,7 +213,7 @@ export default function MobileLayout({
           animation: "overlayIn .2s ease",
         }}>
           {/* Mode row */}
-          <div style={{ padding:"5px 8px 3px", fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:"3px", color:"rgba(80,50,15,.5)" }}>MODE</div>
+          <div style={{ padding:"5px 8px 3px", fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:"3px", color:"rgba(70,42,10,.85)" }}>MODE</div>
           <div style={{ display:"flex", gap:5, paddingBottom:6 }}>
             {[["vs-ai","VS AI"],["vs-player","2 PLAYER"]].map(([m,l]) => (
               <button key={m} onClick={() => { setMode(m); reset(); setShowMenu(false); }} style={{
@@ -227,7 +227,7 @@ export default function MobileLayout({
           </div>
           {/* Difficulty row */}
           {mode === "vs-ai" && <>
-            <div style={{ padding:"0 8px 3px", fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:"3px", color:"rgba(80,50,15,.5)" }}>DIFFICULTY</div>
+            <div style={{ padding:"0 8px 3px", fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:"3px", color:"rgba(70,42,10,.85)" }}>DIFFICULTY</div>
             <div style={{ display:"flex", gap:5, paddingBottom:6 }}>
               {[["easy","EASY"],["medium","MED"],["hard","HARD"]].map(([d,l]) => (
                 <button key={d} onClick={() => { setDifficulty(d); reset(); setShowMenu(false); }} style={{
@@ -265,13 +265,13 @@ export default function MobileLayout({
             <button key={r} onClick={() => setRealmIdx(i)} style={{
               flex: active ? 2 : 1,
               padding: "8px 4px",
-              background: active ? "rgba(255,255,255,.24)" : "rgba(255,255,255,.07)",
+              background: active ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.16)",
               border: `1.5px solid ${active ? rc.border : "rgba(100,70,20,.14)"}`,
               borderRadius: 8,
               fontFamily: "'Cinzel', serif",
               fontSize: active ? 11 : 10,
               letterSpacing: 2,
-              color: active ? rc.text : "rgba(90,65,20,.4)",
+              color: active ? rc.text : "rgba(70,48,14,.8)",
               cursor: "pointer",
               transition: "all .2s cubic-bezier(.34,1.56,.64,1)",
               boxShadow: active ? `0 0 12px ${rc.glow}20` : "none",
@@ -296,9 +296,9 @@ export default function MobileLayout({
           { label:"UMBRAL",  isActive:!wTurn && !aiThinking, dot:"#2a2018", dstroke:"#c8a050", glow:"rgba(160,80,220,.5)", right:true },
         ].map(({ label, isActive, dot, dstroke, glow, right }) => (
           <div key={label} style={{ display:"flex", alignItems:"center", gap:6 }}>
-            {right && <span style={{ fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:2, color:isActive?"rgba(60,30,100,.9)":"rgba(70,50,15,.3)" }}>{label}</span>}
+            {right && <span style={{ fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:2, color:isActive?"rgba(60,30,100,.9)":"rgba(70,48,14,.65)" }}>{label}</span>}
             <div style={{ width:7, height:7, borderRadius:"50%", background:dot, border:`1.5px solid ${dstroke}`, boxShadow:isActive?`0 0 8px ${glow}`:"none", transition:"box-shadow .3s" }}/>
-            {!right && <span style={{ fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:2, color:isActive?"rgba(100,70,18,.9)":"rgba(80,55,20,.3)" }}>{label}</span>}
+            {!right && <span style={{ fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:2, color:isActive?"rgba(100,70,18,.9)":"rgba(70,48,14,.65)" }}>{label}</span>}
           </div>
         ))}
       </div>
@@ -373,7 +373,7 @@ export default function MobileLayout({
           {/* Collapsed one-liner */}
           {sheetH <= SHEET_PEEK + 16 && (
             <div onClick={expandSheet} style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <div style={{ fontFamily:"'Cinzel',serif", fontSize:9, letterSpacing:"3px", color:"rgba(80,50,15,.5)", flexShrink:0 }}>
+              <div style={{ fontFamily:"'Cinzel',serif", fontSize:9, letterSpacing:"3px", color:"rgba(70,42,10,.85)", flexShrink:0 }}>
                 CHRONICLE
               </div>
               <div style={{

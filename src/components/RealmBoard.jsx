@@ -155,7 +155,7 @@ export default function RealmBoard({ realm, cfg, board, sel, moves, lastMove, on
             color: cfg.inkColor,
             fontFamily: "'Cinzel', serif",
             letterSpacing: 1,
-            opacity: 0.55,
+            opacity: 0.9,
           }}>{l}</div>
         ))}
       </div>
