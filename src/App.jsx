@@ -112,7 +112,7 @@ function KingBudgetHUD({ kingFlankMoves, turn }) {
 
   return (
     <div style={{
-      background:"rgba(5,2,14,.92)",
+      background:"rgba(36,24,12,.95)",
       border:"1px solid rgba(180,140,50,.2)",
       borderRadius:8, padding:"10px 12px",
     }}>
@@ -122,7 +122,7 @@ function KingBudgetHUD({ kingFlankMoves, turn }) {
       </div>
       <PipRow used={wUsed} label="Luminar (White)" color="#c8a840" isActive={turn==="white"} />
       <PipRow used={bUsed} label="Umbral (Black)"  color="#9055cc" isActive={turn==="black"} />
-      <div style={{ fontSize:9, color:"rgba(110,85,35,.38)", marginTop:5,
+      <div style={{ fontSize:9, color:"rgba(190,155,90,.72)", marginTop:5,
         fontFamily:F, lineHeight:1.6, letterSpacing:.4 }}>
         King moves in Past Echoes &amp; Fate's Shadow count toward the 13-move limit.
         At 0, the King is immovable in flank realms — temporal checkmate may follow.

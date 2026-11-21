@@ -341,7 +341,7 @@ export function PointsHUD({ stats, lastAward = null }) {
 
       {/* ── Main HUD card ── */}
       <div onClick={() => setOpen(o => !o)} style={{
-        background: "rgba(6,3,16,.93)",
+        background: "rgba(36,24,12,.95)",
         border: `1px solid ${rank.color}42`,
         borderRadius: 10, padding: "12px 14px",
         cursor: "pointer", transition: "border-color .25s",
@@ -364,7 +364,7 @@ export function PointsHUD({ stats, lastAward = null }) {
               </span>
             )}
           </div>
-          <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+          <div style={{ display:"flex", gap:4, alignItems:"center", marginLeft:10, flexShrink:0 }}>
             <span style={{ fontSize:11, fontWeight:600, color:"#4caf50" }}>{stats.wins}W</span>
             <span style={{ fontSize:9, color:"rgba(120,90,30,.35)" }}>/</span>
             <span style={{ fontSize:11, fontWeight:600, color:"#f44336" }}>{stats.losses}L</span>
@@ -401,7 +401,7 @@ export function PointsHUD({ stats, lastAward = null }) {
         {/* Row 3 – CP to next + streak */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           {next
-            ? <span style={{ fontSize:9, color:"rgba(100,72,20,.5)", letterSpacing:.8 }}>
+            ? <span style={{ fontSize:9, color:"rgba(176,138,70,.8)", letterSpacing:.8 }}>
                 {next.min - stats.cp} CP → {next.icon} {next.name}
               </span>
             : <span style={{ fontSize:9, color:"#ff4488", letterSpacing:1 }}>⚔ MAX RANK</span>
