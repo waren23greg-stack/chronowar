@@ -93,9 +93,9 @@ export function OutcomeToast({ result, cpDelta, reason, onDone }) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(() => { setVisible(false); setTimeout(onDone, 400); }, 3200);
+    const t = setTimeout(() => { setVisible(false); setTimeout(onDone, 400); }, result === "quit" ? 3200 : 1000);
     return () => clearTimeout(t);
-  }, [onDone]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const CONFIG = {
     win:   { color: "#4caf50", bg: "rgba(20,60,20,.95)", icon: "⚔", label: "VICTORY",  glow: "rgba(60,200,60,.2)"  },
