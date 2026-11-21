@@ -247,12 +247,12 @@ function computeAccuracy({ captures = 0, crossRealm = 0, checks = 0, promotions 
 }
 
 function classifyAccuracy(pct) {
-  if (pct >= 92) return { label: "Brilliant",  color: "#00bcd4", glyph: "💎" };
-  if (pct >= 80) return { label: "Excellent",  color: "#4caf50", glyph: "✨" };
-  if (pct >= 68) return { label: "Good",       color: "#8bc34a", glyph: "👍" };
-  if (pct >= 55) return { label: "Fair",       color: "#ffc107", glyph: "⚡" };
-  if (pct >= 42) return { label: "Inaccurate", color: "#ff9800", glyph: "⚠" };
-  return             { label: "Blundering", color: "#f44336", glyph: "💀" };
+  if (pct >= 92) return { label: "Relentless",  color: "#00bcd4", glyph: "💎" };
+  if (pct >= 80) return { label: "Fierce",  color: "#4caf50", glyph: "✨" };
+  if (pct >= 68) return { label: "Bold",       color: "#8bc34a", glyph: "👍" };
+  if (pct >= 55) return { label: "Measured",       color: "#ffc107", glyph: "⚡" };
+  if (pct >= 42) return { label: "Passive", color: "#ff9800", glyph: "⚠" };
+  return             { label: "Routed", color: "#f44336", glyph: "💀" };
 }
 
 // ── Award game end ─────────────────────────────────────────────
