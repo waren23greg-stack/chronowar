@@ -1,82 +1,88 @@
-import React, { useState } from 'react';
+import { useState } from "react";
 
 const REWRITE_COST = 20;
+const F = "'Cinzel', serif";
 
-export default function HistoryRewritePanel({ 
-  isOpen, 
-  onClose, 
-  currentCP, 
-  historyLength, 
-  onExecuteRewrite 
-}) {
-  const [selectedTurn, setSelectedTurn] = useState(historyLength > 0 ? historyLength - 1 : 0);
-
+export default function HistoryRewritePanel({ isOpen, onClose, currentCP, historyLength, onExecuteRewrite }) {
+  const [picked, setPicked] = useState(null);
   if (!isOpen) return null;
 
+  // Default to one move back, never to the Genesis by accident.
+  const selectedTurn = picked ?? Math.max(0, historyLength - 2);
   const canAfford = currentCP >= REWRITE_COST;
-  const isShattering = selectedTurn < historyLength - 1;
+  const hasHistory = historyLength >= 2;
+  const isShattering = hasHistory && selectedTurn < historyLength - 1;
+  const ready = canAfford && isShattering;
 
-  const handleRewrite = () => {
-    if (canAfford && isShattering) {
-      onExecuteRewrite(selectedTurn);
-      onClose();
-    }
+  const close = () => { setPicked(null); onClose(); };
+  const rewrite = () => {
+    if (!ready) return;
+    onExecuteRewrite(selectedTurn);
+    close();
   };
 
   return (
-    <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-purple-500/50 p-6 rounded-lg max-w-md w-full shadow-[0_0_30px_rgba(168,85,247,0.2)] text-white font-sans">
-        
-        <h2 className="text-2xl font-bold text-purple-400 mb-2 uppercase tracking-widest">
+    <div onClick={close} style={{
+      position: "fixed", inset: 0, zIndex: 120, padding: 16,
+      background: "rgba(5,3,12,.82)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: "100%", maxWidth: 420, boxSizing: "border-box",
+        background: "linear-gradient(160deg,#1c1409,#0e0c08)",
+        border: "1px solid rgba(168,120,255,.55)", borderRadius: 14, padding: "22px 20px",
+        boxShadow: "0 0 40px rgba(140,80,240,.3), 0 20px 50px rgba(0,0,0,.6)",
+        fontFamily: "'Crimson Text', Georgia, serif", color: "#e8d5a3",
+      }}>
+        <div style={{ fontFamily: F, fontSize: 18, letterSpacing: 4, color: "#c9a8ff", textTransform: "uppercase", marginBottom: 10 }}>
           Shatter Timeline
-        </h2>
-        <p className="text-slate-300 text-sm mb-6">
-          Expend Chronicle Points to collapse the current reality and branch a new timeline from a past divergence point. The abandoned future will be permanently erased.
+        </div>
+        <p style={{ fontSize: 15, lineHeight: 1.55, fontStyle: "italic", color: "rgba(225,205,165,.82)", margin: "0 0 16px" }}>
+          Spend Chronicle Points to collapse this reality and branch a new one from an earlier move. The abandoned future is erased for good.
         </p>
 
-        <div className="bg-slate-800 p-4 rounded mb-6">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-slate-400">Chronicle Points:</span>
-            <span className={`font-bold ${canAfford ? 'text-emerald-400' : 'text-red-400'}`}>
-              {currentCP} / {REWRITE_COST} CP
-            </span>
+        <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(168,120,255,.2)", borderRadius: 10, padding: "14px", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: F, fontSize: 12, letterSpacing: 1.5 }}>
+            <span style={{ color: "rgba(200,170,110,.8)" }}>CHRONICLE POINTS</span>
+            <span style={{ color: canAfford ? "#7fd18a" : "#f08a7a", fontWeight: 700 }}>{currentCP} / {REWRITE_COST} CP</span>
           </div>
-          
-          <label className="block text-slate-400 text-sm mb-2 mt-4">
-            Select Divergence Point (Turn {selectedTurn}):
-          </label>
-          <input 
-            type="range" 
-            min="0" 
-            max={Math.max(0, historyLength - 1)} 
-            value={selectedTurn} 
-            onChange={(e) => setSelectedTurn(parseInt(e.target.value))}
-            className="w-full accent-purple-500"
-          />
-          <div className="flex justify-between text-xs text-slate-500 mt-1">
-            <span>Genesis</span>
-            <span>Present</span>
-          </div>
+
+          {hasHistory ? (
+            <>
+              <div style={{ fontFamily: F, fontSize: 12, letterSpacing: 1.5, color: "rgba(200,170,110,.8)", margin: "16px 0 8px" }}>
+                REWIND TO MOVE {selectedTurn} OF {historyLength - 1}
+              </div>
+              <input
+                type="range" min="0" max={historyLength - 1} value={selectedTurn}
+                onChange={(e) => setPicked(parseInt(e.target.value, 10))}
+                style={{ width: "100%", accentColor: "#a878ff" }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "rgba(200,170,110,.6)" }}>
+                <span>Genesis</span><span>Now</span>
+              </div>
+            </>
+          ) : (
+            <div style={{ marginTop: 14, fontSize: 14, fontStyle: "italic", color: "rgba(200,170,110,.7)" }}>
+              Play a few moves first. There is no earlier moment to return to yet.
+            </div>
+          )}
         </div>
 
-        <div className="flex gap-4">
-          <button 
-            onClick={onClose}
-            className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded transition-colors"
-          >
-            Maintain Reality
-          </button>
-          <button 
-            onClick={handleRewrite}
-            disabled={!canAfford || !isShattering}
-            className={`flex-1 px-4 py-2 rounded font-bold transition-all ${
-              canAfford && isShattering 
-                ? 'bg-purple-600 hover:bg-purple-500 shadow-[0_0_15px_rgba(147,51,234,0.5)] text-white' 
-                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            Rewrite History
-          </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={close} style={{
+            flex: 1, padding: "11px 8px", cursor: "pointer", borderRadius: 8,
+            fontFamily: F, fontSize: 11, letterSpacing: 1.5,
+            background: "rgba(255,255,255,.08)", color: "#e8d5a3", border: "1px solid rgba(200,170,110,.35)",
+          }}>MAINTAIN REALITY</button>
+          <button onClick={rewrite} disabled={!ready} style={{
+            flex: 1, padding: "11px 8px", borderRadius: 8,
+            fontFamily: F, fontSize: 11, letterSpacing: 1.5, fontWeight: 700,
+            cursor: ready ? "pointer" : "not-allowed",
+            background: ready ? "rgba(110,60,210,.95)" : "rgba(255,255,255,.06)",
+            color: ready ? "#fff" : "rgba(200,170,110,.35)",
+            border: `1px solid ${ready ? "rgba(190,150,255,.8)" : "rgba(200,170,110,.2)"}`,
+            boxShadow: ready ? "0 0 16px rgba(140,80,240,.55)" : "none",
+          }}>REWRITE HISTORY</button>
         </div>
       </div>
     </div>
