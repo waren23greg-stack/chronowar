@@ -6,8 +6,8 @@ import { LORE, SYMBOLS } from "../engine";
 export default function ChroniclePanel({ narrating, displayed }) {
   return (
     <div style={{
-      background: "rgba(255,252,240,.92)",
-      border: "1.5px solid rgba(120,80,20,.35)",
+      background: "linear-gradient(160deg,rgba(238,222,180,.97),rgba(214,190,132,.97))",
+      border: "1.5px solid rgba(110,70,20,.55)",
       borderRadius: 10,
       padding: "14px 16px",
       minHeight: 170,
@@ -55,8 +55,8 @@ export default function ChroniclePanel({ narrating, displayed }) {
 export function SagaScroll({ storyLog }) {
   return (
     <div style={{
-      background: "rgba(255,252,240,.9)",
-      border: "1.5px solid rgba(120,80,20,.3)",
+      background: "linear-gradient(160deg,rgba(238,222,180,.97),rgba(214,190,132,.97))",
+      border: "1.5px solid rgba(110,70,20,.55)",
       borderRadius: 10,
       padding: "12px 13px",
       maxHeight: 220,
@@ -122,8 +122,8 @@ export function PieceLegend() {
   ];
   return (
     <div style={{
-      background: "rgba(255,252,240,.88)",
-      border: "1.5px solid rgba(120,80,20,.28)",
+      background: "linear-gradient(160deg,rgba(238,222,180,.97),rgba(214,190,132,.97))",
+      border: "1.5px solid rgba(110,70,20,.55)",
       borderRadius: 10,
       padding: "12px 13px",
       boxShadow: "0 2px 8px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.5)",
